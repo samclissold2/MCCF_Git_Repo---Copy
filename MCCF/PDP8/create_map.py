@@ -6,6 +6,7 @@ import webbrowser
 import logging
 import time
 import argparse
+import os
 from config import (PROJECTS_MAP, SUBSTATION_MAP, TRANSMISSION_MAP, INTEGRATED_MAP, WIND_MAP, GEM_MAP, RESULTS_DIR)
 from map_utils import (clear_cache, load_from_cache, save_to_cache, read_coal_plant_data, read_coal_terminal_data, read_wind_power_data, read_oil_gas_plant_data, read_lng_terminal_data, read_hydropower_data, read_solar_power_data, read_infrastructure_data, read_and_clean_power_data, read_solar_irradiance_points, read_transmission_data, read_powerline_data, get_power_lines, get_power_towers, cache_polylines, read_substation_data, get_source_color, get_voltage_color, read_tif_data, read_planned_substation_data)
 
