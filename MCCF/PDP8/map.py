@@ -1837,7 +1837,7 @@ def create_integrated_map(force_recompute=False):
                 ).add_to(fg)
     
     # Add planned transformers
-    transformer_df = read_planned_transformer_data()
+    transformer_df = read_planned_substation_data()
     if not transformer_df.empty:
         # Group transformers by voltage category - use same categories as existing substations
         def voltage_category(val):
@@ -1871,8 +1871,14 @@ def create_integrated_map(force_recompute=False):
         transformer_fg = folium.FeatureGroup(name="Planned Transformers", show=False).add_to(m)
         
         for _, row in transformer_df.iterrows():
-
-            color = voltage_colors.get(row['voltage_cat'], 'black')
+            # Extract numeric voltage value for color coding directly from voltage_cat
+            try:
+                numeric_voltage = float(str(row['voltage_cat']).replace('kV', '').replace('KV', ''))
+            except:
+                numeric_voltage = 'unknown'
+            
+            # Use the same color coding system as substation map
+            color = get_voltage_color(numeric_voltage)
             folium.Marker(
                 location=[row['lat'], row['lon']],
                 icon=folium.DivIcon(html=f'<div style="font-size:10px; color:{color}; font-weight:bold;">×</div>'),
@@ -2246,29 +2252,29 @@ def create_wind_power_density_map():
     
     return m
 
-def read_planned_transformer_data(force_recompute=False):
+def read_planned_substation_data(force_recompute=False):
     """
     Reads the PDP8_new_transformer.xlsx file and extracts transformer data from all worksheets.
     Returns a DataFrame with transformer information including voltage categorization.
     """
     # Check cache first
     if not force_recompute:
-        cached_data = load_from_cache('read_planned_transformer_data')
+        cached_data = load_from_cache('read_planned_substation_data')
         if cached_data is not None:
             return cached_data
     
     start_time = time.time()
-    logging.info("Starting planned transformer data reading")
+    logging.info("Starting planned substation data reading")
     
     transformer_file = DATA_DIR / "PDP8_new_transformer.xlsx"
     
     if not transformer_file.exists():
-        logging.error(f"Planned transformer file not found: {transformer_file}")
+        logging.error(f"Planned substation file not found: {transformer_file}")
         return pd.DataFrame()
     
     try:
         # Read all sheets from the Excel file
-        logging.info(f"Reading transformer data from {transformer_file}")
+        logging.info(f"Reading substation data from {transformer_file}")
         excel_file = pd.ExcelFile(transformer_file)
         logging.info(f"Found {len(excel_file.sheet_names)} worksheets: {excel_file.sheet_names}")
         
@@ -2364,7 +2370,7 @@ def read_planned_transformer_data(force_recompute=False):
             logging.info(f"Transformer data processing completed in {processing_time:.2f} seconds")
             
             # Save to cache
-            save_to_cache('read_planned_transformer_data', combined_df)
+            save_to_cache('read_planned_substation_data', combined_df)
             
             return combined_df
         else:
@@ -2379,7 +2385,7 @@ def create_new_transformer_map(force_recompute=False):
     """
     Creates a map showing planned new transformers from the PDP8 data.
     """
-    df = read_planned_transformer_data(force_recompute=force_recompute)
+    df = read_planned_substation_data(force_recompute=force_recompute)
     
     if df.empty:
         print("No transformer data available for mapping")
