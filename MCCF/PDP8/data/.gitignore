@@ -1,0 +1,17 @@
+# Large data files
+*.csv
+*.xlsx
+*.xls
+
+# Keep only the compressed/organized versions
+!organized/
+!*.zip
+!*.parquet
+
+# Exclude backup directories
+old_chunks_backup/
+__pycache__/
+*.pyc
+
+# Keep metadata files
+!*_metadata.json

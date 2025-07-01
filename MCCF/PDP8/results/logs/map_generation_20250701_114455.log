@@ -1,0 +1,86 @@
+2025-07-01 11:44:55 - INFO - setup_logging - Logging initialized. Log file: C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\results\logs\map_generation_20250701_114455.log
+2025-07-01 11:44:55 - INFO - main - Starting map generation process
+2025-07-01 11:44:55 - INFO - main - Generating map type: power
+2025-07-01 11:44:55 - INFO - main - Generating power project map
+2025-07-01 11:44:55 - INFO - read_and_clean_power_data - Starting power data reading and cleaning
+2025-07-01 11:44:55 - INFO - read_and_clean_power_data - Reading 11 sheets from C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\data\PDP8 project data (2).xlsx
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Processing solar sheet with 340 rows
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with empty project names
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Found 6 unique operational phases
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with invalid periods
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Completed processing solar sheet
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Processing onshore sheet with 197 rows
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with empty project names
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Found 4 unique operational phases
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with invalid periods
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Completed processing onshore sheet
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Processing LNG-fired gas sheet with 26 rows
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with empty project names
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Found 2 unique operational phases
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with invalid periods
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Completed processing LNG-fired gas sheet
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Processing cogeneration sheet with 8 rows
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with empty project names
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Found 2 unique operational phases
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with invalid periods
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Completed processing cogeneration sheet
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Processing domestic gas-fired sheet with 10 rows
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with empty project names
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Found 1 unique operational phases
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with invalid periods
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Completed processing domestic gas-fired sheet
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Processing hydro sheet with 12 rows
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with empty project names
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Found 2 unique operational phases
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with invalid periods
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Completed processing hydro sheet
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Processing pumped-storage sheet with 22 rows
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with empty project names
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Found 2 unique operational phases
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with invalid periods
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Completed processing pumped-storage sheet
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Processing nuclear sheet with 2 rows
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with empty project names
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Found 1 unique operational phases
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with invalid periods
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Completed processing nuclear sheet
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Processing biomass sheet with 29 rows
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with empty project names
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Found 11 unique operational phases
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with invalid periods
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Completed processing biomass sheet
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Processing waste-to-energy sheet with 9 rows
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with empty project names
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Found 1 unique operational phases
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 4 rows with invalid periods
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Completed processing waste-to-energy sheet
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Processing flexible sheet with 3 rows
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with empty project names
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Found 2 unique operational phases
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Filtered 0 rows with invalid periods
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Completed processing flexible sheet
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Combining all processed sheets
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Processing coordinates and capacity
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Dropped 0 rows with invalid coordinates or capacity
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Power data processing completed in 0.38 seconds
+2025-07-01 11:44:56 - INFO - read_and_clean_power_data - Final dataset has 654 rows
+2025-07-01 11:44:56 - INFO - save_to_cache - Saved read_and_clean_power_data data to cache
+2025-07-01 11:44:56 - INFO - create_folium_map - Starting base map creation
+2025-07-01 11:44:56 - INFO - create_folium_map - Adding map plugins
+2025-07-01 11:44:56 - INFO - create_folium_map - Adding legend control script
+2025-07-01 11:44:56 - INFO - create_folium_map - Base map creation completed in 0.01 seconds
+2025-07-01 11:44:56 - INFO - add_project_layers - Starting project layer addition
+2025-07-01 11:44:56 - INFO - add_project_layers - Creating feature groups
+2025-07-01 11:44:56 - INFO - add_project_layers - Adding markers to map
+2025-07-01 11:44:56 - INFO - add_project_layers - Added 100 markers to map
+2025-07-01 11:44:56 - INFO - add_project_layers - Added 200 markers to map
+2025-07-01 11:44:56 - INFO - add_project_layers - Added 300 markers to map
+2025-07-01 11:44:56 - INFO - add_project_layers - Added 400 markers to map
+2025-07-01 11:44:56 - INFO - add_project_layers - Added 500 markers to map
+2025-07-01 11:44:56 - INFO - add_project_layers - Added 600 markers to map
+2025-07-01 11:44:56 - INFO - add_project_layers - Total markers added: 654
+2025-07-01 11:44:56 - INFO - save_and_open_map - Starting map saving process
+2025-07-01 11:44:56 - INFO - save_and_open_map - Saving map to C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\results\PDP8_power_projects_map.html
+2025-07-01 11:44:56 - INFO - save_and_open_map - Opening map in browser: C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\results\PDP8_power_projects_map.html
+2025-07-01 11:44:56 - INFO - save_and_open_map - Map saving and opening completed in 0.52 seconds
+2025-07-01 11:44:56 - INFO - main - Map generation completed in 1.00 seconds

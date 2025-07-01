@@ -1,0 +1,31 @@
+2025-07-01 11:53:16 - INFO - setup_logging - Logging initialized. Log file: C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\results\logs\map_generation_20250701_115316.log
+2025-07-01 11:53:16 - INFO - main - Starting map generation process
+2025-07-01 11:53:16 - INFO - main - Generating map type: transmission
+2025-07-01 11:53:16 - INFO - main - Generating transmission map
+2025-07-01 11:53:16 - INFO - load_from_cache - Loaded read_transmission_data data from cache
+2025-07-01 11:53:16 - INFO - create_folium_map - Starting base map creation
+2025-07-01 11:53:16 - INFO - create_folium_map - Adding map plugins
+2025-07-01 11:53:16 - INFO - create_folium_map - Adding legend control script
+2025-07-01 11:53:16 - INFO - create_folium_map - Base map creation completed in 0.00 seconds
+2025-07-01 11:53:16 - ERROR - main - Error creating map: 'voltage'
+Traceback (most recent call last):
+  File "C:\Users\SamClissold\anaconda3\envs\mccf-env\lib\site-packages\pandas\core\indexes\base.py", line 3812, in get_loc
+    return self._engine.get_loc(casted_key)
+  File "pandas/_libs/index.pyx", line 167, in pandas._libs.index.IndexEngine.get_loc
+  File "pandas/_libs/index.pyx", line 196, in pandas._libs.index.IndexEngine.get_loc
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7088, in pandas._libs.hashtable.PyObjectHashTable.get_item
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7096, in pandas._libs.hashtable.PyObjectHashTable.get_item
+KeyError: 'voltage'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\map.py", line 2418, in main
+    m = create_transmission_map(read_transmission_data(force_recompute=args.force_recompute))
+  File "C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\map.py", line 1245, in create_transmission_map
+    for voltage in df['voltage'].unique():
+  File "C:\Users\SamClissold\anaconda3\envs\mccf-env\lib\site-packages\pandas\core\frame.py", line 4107, in __getitem__
+    indexer = self.columns.get_loc(key)
+  File "C:\Users\SamClissold\anaconda3\envs\mccf-env\lib\site-packages\pandas\core\indexes\base.py", line 3819, in get_loc
+    raise KeyError(key) from err
+KeyError: 'voltage'

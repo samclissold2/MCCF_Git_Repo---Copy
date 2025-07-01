@@ -1,0 +1,39 @@
+2025-07-01 12:22:34 - INFO - setup_logging - Logging initialized. Log file: C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\results\logs\map_generation_20250701_122234.log
+2025-07-01 12:22:34 - INFO - main - Starting map generation process
+2025-07-01 12:22:34 - INFO - main - Generating map type: integrated
+2025-07-01 12:22:34 - INFO - main - Generating integrated map
+2025-07-01 12:22:34 - INFO - create_folium_map - Starting base map creation
+2025-07-01 12:22:34 - INFO - create_folium_map - Adding map plugins
+2025-07-01 12:22:34 - INFO - create_folium_map - Adding legend control script
+2025-07-01 12:22:34 - INFO - create_folium_map - Base map creation completed in 0.01 seconds
+2025-07-01 12:22:34 - INFO - read_transmission_data - Starting transmission data reading
+2025-07-01 12:22:34 - INFO - read_transmission_data - Reading transmission data from C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\data\infrastructure_data.xlsx
+2025-07-01 12:23:01 - INFO - read_transmission_data - Initial data shape: (103453, 29)
+2025-07-01 12:23:01 - INFO - read_transmission_data - Filtered 0 rows with blank location
+2025-07-01 12:23:01 - INFO - read_transmission_data - Filtered 93430 rows with invalid location type
+2025-07-01 12:23:01 - INFO - read_transmission_data - Kept columns: ['location', 'longitude', 'latitude', 'max_voltage']
+2025-07-01 12:23:01 - INFO - read_transmission_data - Transmission data reading completed in 27.64 seconds
+2025-07-01 12:23:01 - INFO - read_transmission_data - Final transmission records: 10023
+2025-07-01 12:23:01 - INFO - save_to_cache - Saved read_transmission_data data to cache
+2025-07-01 12:23:01 - INFO - read_substation_data - Starting substation data reading
+2025-07-01 12:23:01 - INFO - read_substation_data - Reading substation data from C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\data\infrastructure_data.xlsx
+2025-07-01 12:23:37 - INFO - read_substation_data - Initial data shape: (103453, 29)
+2025-07-01 12:23:37 - INFO - read_substation_data - Filtered 0 rows with blank substation type
+2025-07-01 12:23:37 - INFO - read_substation_data - Kept columns: ['substation_type', 'max_voltage', 'longitude', 'latitude']
+2025-07-01 12:23:37 - INFO - read_substation_data - Substation data reading completed in 36.15 seconds
+2025-07-01 12:23:37 - INFO - read_substation_data - Final substation records: 103453
+2025-07-01 12:23:37 - INFO - save_to_cache - Saved read_substation_data data to cache
+2025-07-01 12:23:37 - INFO - read_openinfra_existing_generators - Starting OpenInfra existing generators data reading
+2025-07-01 12:23:37 - INFO - read_openinfra_existing_generators - Reading generator data from C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\data\openinfra_existing_generator_data.xlsx
+2025-07-01 12:23:38 - INFO - read_openinfra_existing_generators - Initial data shape: (2092, 29), Columns: ['id', 'name', 'name_en', 'operator', 'wd_operator', 'construction', 'source', 'output', 'method', 'start_date', 'longitude', 'latitude', 'wikidata', 'ref', 'location', 'max_voltage', 'voltages', 'frequency', 'circuits', 'cables', 'substation_type', 'transformer', 'v_primary', 'v_secondary', 'v_tertiary', 'rating', 'type', 'transition', 'substance']
+2025-07-01 12:23:38 - INFO - read_openinfra_existing_generators - Kept and renamed 4 required columns
+2025-07-01 12:23:38 - INFO - read_openinfra_existing_generators - OpenInfra existing generators data reading completed in 0.75 seconds
+2025-07-01 12:23:38 - INFO - read_openinfra_existing_generators - Final generator records: 2092
+2025-07-01 12:23:38 - INFO - save_to_cache - Saved read_openinfra_existing_generators data to cache
+2025-07-01 12:23:38 - INFO - create_integrated_map - Filtered 2465 transmission rows with NaN voltage values
+2025-07-01 12:23:41 - INFO - create_integrated_map - Filtered 95016 substation rows with NaN voltage values
+2025-07-01 12:23:46 - INFO - save_and_open_map - Starting map saving process
+2025-07-01 12:23:46 - INFO - save_and_open_map - Saving map to C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\results\vn_integrated_map.html
+2025-07-01 12:24:26 - INFO - save_and_open_map - Opening map in browser: C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\results\vn_integrated_map.html
+2025-07-01 12:24:27 - INFO - save_and_open_map - Map saving and opening completed in 41.38 seconds
+2025-07-01 12:24:27 - INFO - main - Map generation completed in 113.42 seconds

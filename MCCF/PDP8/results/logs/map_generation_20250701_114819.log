@@ -1,0 +1,32 @@
+2025-07-01 11:48:19 - INFO - setup_logging - Logging initialized. Log file: C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\results\logs\map_generation_20250701_114819.log
+2025-07-01 11:48:19 - INFO - main - Starting map generation process
+2025-07-01 11:48:19 - INFO - main - Generating map type: all
+2025-07-01 11:48:19 - INFO - main - Generating power project map
+2025-07-01 11:48:19 - INFO - load_from_cache - Loaded read_and_clean_power_data data from cache
+2025-07-01 11:48:19 - INFO - create_folium_map - Starting base map creation
+2025-07-01 11:48:19 - INFO - create_folium_map - Adding map plugins
+2025-07-01 11:48:19 - INFO - create_folium_map - Adding legend control script
+2025-07-01 11:48:19 - INFO - create_folium_map - Base map creation completed in 0.02 seconds
+2025-07-01 11:48:19 - INFO - add_project_layers - Starting project layer addition
+2025-07-01 11:48:19 - INFO - add_project_layers - Creating feature groups
+2025-07-01 11:48:19 - INFO - add_project_layers - Adding markers to map
+2025-07-01 11:48:19 - INFO - add_project_layers - Added 100 markers to map
+2025-07-01 11:48:19 - INFO - add_project_layers - Added 200 markers to map
+2025-07-01 11:48:19 - INFO - add_project_layers - Added 300 markers to map
+2025-07-01 11:48:19 - INFO - add_project_layers - Added 400 markers to map
+2025-07-01 11:48:19 - INFO - add_project_layers - Added 500 markers to map
+2025-07-01 11:48:19 - INFO - add_project_layers - Added 600 markers to map
+2025-07-01 11:48:19 - INFO - add_project_layers - Total markers added: 654
+2025-07-01 11:48:19 - INFO - save_and_open_map - Starting map saving process
+2025-07-01 11:48:19 - INFO - save_and_open_map - Saving map to C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\results\PDP8_power_projects_map.html
+2025-07-01 11:48:19 - INFO - save_and_open_map - Opening map in browser: C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\results\PDP8_power_projects_map.html
+2025-07-01 11:48:19 - INFO - save_and_open_map - Map saving and opening completed in 0.57 seconds
+2025-07-01 11:48:19 - INFO - main - Generating substation map
+2025-07-01 11:48:19 - INFO - load_from_cache - Loaded read_substation_data data from cache
+2025-07-01 11:48:19 - INFO - create_substation_map - Replaced 95016 NaN voltage values with 'unknown'
+2025-07-01 11:48:19 - INFO - create_folium_map - Starting base map creation
+2025-07-01 11:48:19 - INFO - create_folium_map - Adding map plugins
+2025-07-01 11:48:19 - INFO - create_folium_map - Adding legend control script
+2025-07-01 11:48:19 - INFO - create_folium_map - Base map creation completed in 0.00 seconds
+2025-07-01 11:48:41 - INFO - save_and_open_map - Starting map saving process
+2025-07-01 11:48:41 - INFO - save_and_open_map - Saving map to C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\results\vn_substation_map.html

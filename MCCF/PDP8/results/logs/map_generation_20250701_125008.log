@@ -1,0 +1,74 @@
+2025-07-01 12:50:08 - INFO - setup_logging - Logging initialized. Log file: C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\results\logs\map_generation_20250701_125008.log
+2025-07-01 12:50:08 - INFO - main - Starting map generation process
+2025-07-01 12:50:08 - INFO - main - Generating map type: integrated
+2025-07-01 12:50:08 - INFO - main - Generating integrated map
+2025-07-01 12:50:08 - INFO - get_power_lines - Reading powerline data from C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\data\VNM.gpkg
+2025-07-01 12:50:08 - INFO - get_power_lines - Read 10023 powerline records
+2025-07-01 12:50:08 - INFO - cache_polylines - Computing DBSCAN clusters and greedy paths for each voltage category...
+2025-07-01 12:50:15 - INFO - cache_polylines - Saved polylines to C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\results\powerline_polylines.geojson
+2025-07-01 12:50:16 - INFO - load_from_cache - Loaded read_substation_data data from cache
+2025-07-01 12:50:17 - INFO - read_solar_irradiance_points - Starting solar irradiance data reading
+2025-07-01 12:50:17 - INFO - read_solar_irradiance_points - Reading solar irradiance data from C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\data\extracted_data\solar_irradiance_points.csv
+2025-07-01 12:50:19 - INFO - read_solar_irradiance_points - Read 1843200 solar irradiance points
+2025-07-01 12:50:19 - INFO - read_solar_irradiance_points - Solar irradiance data reading completed in 2.14 seconds
+2025-07-01 12:54:58 - INFO - load_from_cache - Loaded read_and_clean_power_data data from cache
+2025-07-01 12:54:58 - INFO - read_planned_transformer_data - Starting planned transformer data reading
+2025-07-01 12:54:58 - INFO - read_planned_transformer_data - Reading transformer data from C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\data\PDP8_new_transformer.xlsx
+2025-07-01 12:54:59 - INFO - read_planned_transformer_data - Found 6 worksheets: ['220kV central', '220kV transformer south', '500kV transformer central', '500kV central', 'new and upgrade 200kv transform', 'New Transformer']
+2025-07-01 12:54:59 - INFO - read_planned_transformer_data - Processing sheet: 220kV central
+2025-07-01 12:54:59 - INFO - read_planned_transformer_data - Detected voltage 220kV from sheet name
+2025-07-01 12:54:59 - INFO - read_planned_transformer_data - Initial data shape for 220kV central: (110, 6)
+2025-07-01 12:54:59 - INFO - read_planned_transformer_data - Found location columns: latititude, longitude
+2025-07-01 12:54:59 - INFO - read_planned_transformer_data - Applied sheet voltage 220kV to all transformers
+2025-07-01 12:54:59 - INFO - read_planned_transformer_data - Dropped 0 rows with missing coordinates
+2025-07-01 12:54:59 - INFO - read_planned_transformer_data - Added 110 valid transformer records from 220kV central
+2025-07-01 12:54:59 - INFO - read_planned_transformer_data - Sheet 220kV central processing completed in 0.16 seconds
+2025-07-01 12:54:59 - INFO - read_planned_transformer_data - Processing sheet: 220kV transformer south
+2025-07-01 12:54:59 - INFO - read_planned_transformer_data - Detected voltage 220kV from sheet name
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Initial data shape for 220kV transformer south: (165, 6)
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Found location columns: latititude, longitude
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Applied sheet voltage 220kV to all transformers
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Dropped 0 rows with missing coordinates
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Added 165 valid transformer records from 220kV transformer south
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Sheet 220kV transformer south processing completed in 0.16 seconds
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Processing sheet: 500kV transformer central
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Detected voltage 500kV from sheet name
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Initial data shape for 500kV transformer central: (60, 6)
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Found location columns: latititude, longitude
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Applied sheet voltage 500kV to all transformers
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Dropped 0 rows with missing coordinates
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Added 60 valid transformer records from 500kV transformer central
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Sheet 500kV transformer central processing completed in 0.14 seconds
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Processing sheet: 500kV central
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Detected voltage 500kV from sheet name
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Initial data shape for 500kV central: (36, 6)
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Found location columns: latititude, longitude
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Applied sheet voltage 500kV to all transformers
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Dropped 0 rows with missing coordinates
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Added 36 valid transformer records from 500kV central
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Sheet 500kV central processing completed in 0.14 seconds
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Processing sheet: new and upgrade 200kv transform
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Detected voltage 220kV from sheet name
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Initial data shape for new and upgrade 200kv transform: (266, 6)
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Found location columns: latititude, longitude
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Applied sheet voltage 220kV to all transformers
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Dropped 0 rows with missing coordinates
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Added 266 valid transformer records from new and upgrade 200kv transform
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Sheet new and upgrade 200kv transform processing completed in 0.21 seconds
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Processing sheet: New Transformer
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Initial data shape for New Transformer: (75, 6)
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Found location columns: latititude, longitude
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Dropped 0 rows with missing coordinates
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Added 75 valid transformer records from New Transformer
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Sheet New Transformer processing completed in 0.15 seconds
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Combining all processed sheets
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Final combined shape: (712, 5)
+2025-07-01 12:55:00 - INFO - read_planned_transformer_data - Transformer data processing completed in 2.39 seconds
+2025-07-01 12:55:00 - INFO - save_to_cache - Saved read_planned_transformer_data data to cache
+2025-07-01 12:55:00 - ERROR - main - Error creating map: name 'voltage_cat' is not defined
+Traceback (most recent call last):
+  File "C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\map.py", line 2837, in main
+    m = create_integrated_map(force_recompute=args.force_recompute)
+  File "C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\map.py", line 1875, in create_integrated_map
+    tooltip=f"Planned Transformer ({voltage_cat}) - {row['name']} - {row['sheet_source']}"
+NameError: name 'voltage_cat' is not defined

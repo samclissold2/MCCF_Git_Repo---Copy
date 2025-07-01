@@ -1,0 +1,54 @@
+2025-07-01 12:19:14 - INFO - setup_logging - Logging initialized. Log file: C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\results\logs\map_generation_20250701_121914.log
+2025-07-01 12:19:14 - INFO - main - Starting map generation process
+2025-07-01 12:19:14 - INFO - main - Generating map type: integrated
+2025-07-01 12:19:14 - INFO - main - Generating integrated map
+2025-07-01 12:19:14 - INFO - create_folium_map - Starting base map creation
+2025-07-01 12:19:14 - INFO - create_folium_map - Adding map plugins
+2025-07-01 12:19:14 - INFO - create_folium_map - Adding legend control script
+2025-07-01 12:19:14 - INFO - create_folium_map - Base map creation completed in 0.01 seconds
+2025-07-01 12:19:14 - INFO - read_transmission_data - Starting transmission data reading
+2025-07-01 12:19:14 - INFO - read_transmission_data - Reading transmission data from C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\data\infrastructure_data.xlsx
+2025-07-01 12:19:40 - INFO - read_transmission_data - Initial data shape: (103453, 29)
+2025-07-01 12:19:40 - INFO - read_transmission_data - Filtered 0 rows with blank location
+2025-07-01 12:19:40 - INFO - read_transmission_data - Filtered 93430 rows with invalid location type
+2025-07-01 12:19:40 - INFO - read_transmission_data - Kept columns: ['location', 'longitude', 'latitude', 'max_voltage']
+2025-07-01 12:19:40 - INFO - read_transmission_data - Transmission data reading completed in 26.16 seconds
+2025-07-01 12:19:40 - INFO - read_transmission_data - Final transmission records: 10023
+2025-07-01 12:19:40 - INFO - save_to_cache - Saved read_transmission_data data to cache
+2025-07-01 12:19:40 - INFO - read_substation_data - Starting substation data reading
+2025-07-01 12:19:40 - INFO - read_substation_data - Reading substation data from C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\data\infrastructure_data.xlsx
+2025-07-01 12:20:15 - INFO - read_substation_data - Initial data shape: (103453, 29)
+2025-07-01 12:20:15 - INFO - read_substation_data - Filtered 0 rows with blank substation type
+2025-07-01 12:20:15 - INFO - read_substation_data - Kept columns: ['substation_type', 'max_voltage', 'longitude', 'latitude']
+2025-07-01 12:20:15 - INFO - read_substation_data - Substation data reading completed in 34.70 seconds
+2025-07-01 12:20:15 - INFO - read_substation_data - Final substation records: 103453
+2025-07-01 12:20:15 - INFO - save_to_cache - Saved read_substation_data data to cache
+2025-07-01 12:20:15 - INFO - read_openinfra_existing_generators - Starting OpenInfra existing generators data reading
+2025-07-01 12:20:15 - INFO - read_openinfra_existing_generators - Reading generator data from C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\data\openinfra_existing_generator_data.xlsx
+2025-07-01 12:20:15 - INFO - read_openinfra_existing_generators - Initial data shape: (2092, 29), Columns: ['id', 'name', 'name_en', 'operator', 'wd_operator', 'construction', 'source', 'output', 'method', 'start_date', 'longitude', 'latitude', 'wikidata', 'ref', 'location', 'max_voltage', 'voltages', 'frequency', 'circuits', 'cables', 'substation_type', 'transformer', 'v_primary', 'v_secondary', 'v_tertiary', 'rating', 'type', 'transition', 'substance']
+2025-07-01 12:20:15 - INFO - read_openinfra_existing_generators - Kept and renamed 4 required columns
+2025-07-01 12:20:15 - INFO - read_openinfra_existing_generators - OpenInfra existing generators data reading completed in 0.33 seconds
+2025-07-01 12:20:15 - INFO - read_openinfra_existing_generators - Final generator records: 2092
+2025-07-01 12:20:15 - INFO - save_to_cache - Saved read_openinfra_existing_generators data to cache
+2025-07-01 12:20:15 - ERROR - main - Error creating map: 'voltage'
+Traceback (most recent call last):
+  File "C:\Users\SamClissold\anaconda3\envs\mccf-env\lib\site-packages\pandas\core\indexes\base.py", line 3812, in get_loc
+    return self._engine.get_loc(casted_key)
+  File "pandas/_libs/index.pyx", line 167, in pandas._libs.index.IndexEngine.get_loc
+  File "pandas/_libs/index.pyx", line 196, in pandas._libs.index.IndexEngine.get_loc
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7088, in pandas._libs.hashtable.PyObjectHashTable.get_item
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7096, in pandas._libs.hashtable.PyObjectHashTable.get_item
+KeyError: 'voltage'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\map.py", line 2446, in main
+    m = create_integrated_map(force_recompute=args.force_recompute)
+  File "C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\map.py", line 1466, in create_integrated_map
+    for voltage in transmission_df['voltage'].unique():
+  File "C:\Users\SamClissold\anaconda3\envs\mccf-env\lib\site-packages\pandas\core\frame.py", line 4107, in __getitem__
+    indexer = self.columns.get_loc(key)
+  File "C:\Users\SamClissold\anaconda3\envs\mccf-env\lib\site-packages\pandas\core\indexes\base.py", line 3819, in get_loc
+    raise KeyError(key) from err
+KeyError: 'voltage'

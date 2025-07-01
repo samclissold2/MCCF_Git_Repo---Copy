@@ -1,0 +1,12 @@
+2025-07-01 12:38:40 - INFO - setup_logging - Logging initialized. Log file: C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\results\logs\map_generation_20250701_123840.log
+2025-07-01 12:38:40 - INFO - main - Starting map generation process
+2025-07-01 12:38:40 - INFO - main - Generating map type: transmission
+2025-07-01 12:38:40 - INFO - main - Generating transmission map
+2025-07-01 12:38:40 - INFO - create_transmission_map - Starting transmission map creation
+2025-07-01 12:38:40 - ERROR - main - Error creating map: name 'read_powerline_data' is not defined
+Traceback (most recent call last):
+  File "C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\map.py", line 2509, in main
+    m = create_transmission_map(force_recompute=args.force_recompute)
+  File "C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\map.py", line 1250, in create_transmission_map
+    powerline_features = read_powerline_data(force_recompute=force_recompute)
+NameError: name 'read_powerline_data' is not defined

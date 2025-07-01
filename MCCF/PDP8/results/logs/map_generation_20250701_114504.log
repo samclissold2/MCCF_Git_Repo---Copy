@@ -1,0 +1,37 @@
+2025-07-01 11:45:04 - INFO - setup_logging - Logging initialized. Log file: C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\results\logs\map_generation_20250701_114504.log
+2025-07-01 11:45:04 - INFO - main - Starting map generation process
+2025-07-01 11:45:04 - INFO - main - Generating map type: integrated
+2025-07-01 11:45:04 - INFO - main - Generating integrated map
+2025-07-01 11:45:04 - INFO - create_folium_map - Starting base map creation
+2025-07-01 11:45:04 - INFO - create_folium_map - Adding map plugins
+2025-07-01 11:45:04 - INFO - create_folium_map - Adding legend control script
+2025-07-01 11:45:04 - INFO - create_folium_map - Base map creation completed in 0.01 seconds
+2025-07-01 11:45:04 - INFO - read_transmission_data - Starting transmission data reading
+2025-07-01 11:45:04 - INFO - read_transmission_data - Reading transmission data from C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\data\infrastructure_data.xlsx
+2025-07-01 11:45:11 - INFO - read_transmission_data - Initial data shape: (103453, 29)
+2025-07-01 11:45:11 - INFO - read_transmission_data - Filtered 0 rows with blank location
+2025-07-01 11:45:11 - INFO - read_transmission_data - Filtered 93430 rows with invalid location type
+2025-07-01 11:45:11 - INFO - read_transmission_data - Kept columns: ['location', 'longitude', 'latitude']
+2025-07-01 11:45:11 - INFO - read_transmission_data - Transmission data reading completed in 7.08 seconds
+2025-07-01 11:45:11 - INFO - read_transmission_data - Final transmission records: 10023
+2025-07-01 11:45:11 - INFO - save_to_cache - Saved read_transmission_data data to cache
+2025-07-01 11:45:11 - INFO - load_from_cache - Loaded read_substation_data data from cache
+2025-07-01 11:45:11 - INFO - read_openinfra_existing_generators - Starting OpenInfra existing generators data reading
+2025-07-01 11:45:11 - INFO - read_openinfra_existing_generators - Required columns: ['source', 'latitude', 'longitude', 'output_mw']
+2025-07-01 11:45:11 - INFO - read_openinfra_existing_generators - Reading generator data from C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\data\openinfra_existing_generator_data.xlsx
+2025-07-01 11:45:11 - INFO - read_openinfra_existing_generators - Initial data shape: (2092, 29), Columns: ['id', 'name', 'name_en', 'operator', 'wd_operator', 'construction', 'source', 'output', 'method', 'start_date', 'longitude', 'latitude', 'wikidata', 'ref', 'location', 'max_voltage', 'voltages', 'frequency', 'circuits', 'cables', 'substation_type', 'transformer', 'v_primary', 'v_secondary', 'v_tertiary', 'rating', 'type', 'transition', 'substance']
+2025-07-01 11:45:11 - ERROR - read_openinfra_existing_generators - Missing required columns: ['output_mw']
+2025-07-01 11:45:11 - ERROR - read_openinfra_existing_generators - Error reading OpenInfra existing generators data: Missing required columns in C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\data\openinfra_existing_generator_data.xlsx: ['output_mw']
+Traceback (most recent call last):
+  File "C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\map.py", line 1577, in read_openinfra_existing_generators
+    raise ValueError(f"Missing required columns in {OPENINFRA_EXISTING_GENERATOR_DATA}: {missing_cols}")
+ValueError: Missing required columns in C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\data\openinfra_existing_generator_data.xlsx: ['output_mw']
+2025-07-01 11:45:11 - ERROR - main - Error creating map: Missing required columns in C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\data\openinfra_existing_generator_data.xlsx: ['output_mw']
+Traceback (most recent call last):
+  File "C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\map.py", line 2411, in main
+    m = create_integrated_map(force_recompute=args.force_recompute)
+  File "C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\map.py", line 1430, in create_integrated_map
+    generator_df = read_openinfra_existing_generators(force_recompute=force_recompute)
+  File "C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\map.py", line 1577, in read_openinfra_existing_generators
+    raise ValueError(f"Missing required columns in {OPENINFRA_EXISTING_GENERATOR_DATA}: {missing_cols}")
+ValueError: Missing required columns in C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\data\openinfra_existing_generator_data.xlsx: ['output_mw']

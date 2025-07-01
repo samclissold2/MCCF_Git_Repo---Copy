@@ -1,0 +1,14 @@
+2025-07-01 11:59:30 - INFO - setup_logging - Logging initialized. Log file: C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\results\logs\map_generation_20250701_115930.log
+2025-07-01 11:59:30 - INFO - main - Starting map generation process
+2025-07-01 11:59:30 - INFO - main - Generating map type: transmission
+2025-07-01 11:59:30 - INFO - main - Generating transmission map
+2025-07-01 11:59:30 - INFO - load_from_cache - Loaded read_transmission_data data from cache
+2025-07-01 11:59:30 - ERROR - main - Error creating map: ['max_voltage']
+Traceback (most recent call last):
+  File "C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\map.py", line 2440, in main
+    m = create_transmission_map(read_transmission_data(force_recompute=args.force_recompute))
+  File "C:\Users\SamClissold\MCCF_Git_Repo\MCCF\PDP8\map.py", line 1252, in create_transmission_map
+    df = df.dropna(subset=['max_voltage'])
+  File "C:\Users\SamClissold\anaconda3\envs\mccf-env\lib\site-packages\pandas\core\frame.py", line 6677, in dropna
+    raise KeyError(np.array(subset)[check].tolist())
+KeyError: ['max_voltage']
