@@ -1,14 +1,8 @@
-# This repository contains code, data, and analysis related to Vietnam’s power sector, compiled as part of ongoing work at the Mekong Centre for Climate Finance. It supports exploratory and policy-relevant research at the intersection of energy, finance, and climate policy.
-# Focus Areas
-- Power generation and capacity expansion
-- Renewable integration and coal phase-out
-- Financial modelling of infrastructure assets
-- Policy risk analysis and Just Energy Transition
+# MCCF Package
 
+The `MCCF` package collects utilities used by the Mekong Centre for Climate Finance. It contains two main groups of code:
 
-## Structure
-- `data/` – Raw and processed datasets (non-sensitive)
-- `notebooks/` – Exploratory Jupyter notebooks and analysis scripts
-- `src/` – Reusable code modules and utilities
-- `outputs/` – Charts, tables, and visualisations for reports
-- `docs/` – Draft notes, documentation, and project outlines
+1. **PDP8 mapping tools (`MCCF/PDP8`)** – scripts for producing interactive maps of Vietnam's power projects and grid infrastructure.
+2. **API & translation helpers (`MCCF/API tools`)** – standalone scripts that integrate with Google Cloud and OpenAI for OCR and translation tasks.
+
+Most modules are intended to be executed directly rather than imported. See the repository [README](../README.md) for installation and usage instructions.
