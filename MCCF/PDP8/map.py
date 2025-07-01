@@ -87,34 +87,23 @@ def clear_cache(function_name=None):
 
 # Configure logging
 def setup_logging():
-    """Configure logging with custom format and file output"""
-    log_dir = RESULTS_DIR / 'logs'
-    log_dir.mkdir(exist_ok=True)
-    
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    log_file = log_dir / f'map_generation_{timestamp}.log'
-    
+    """Configure logging with console output only"""
     # Create formatter
     formatter = logging.Formatter(
         '%(asctime)s - %(levelname)s - %(funcName)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     
-    # Setup file handler
-    file_handler = logging.FileHandler(log_file)
-    file_handler.setFormatter(formatter)
-    
-    # Setup console handler
+    # Setup console handler only
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
     
     # Configure root logger
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
-    logger.addHandler(file_handler)
     logger.addHandler(console_handler)
     
-    logging.info(f"Logging initialized. Log file: {log_file}")
+    logging.info("Logging initialized. Console output only.")
 
 # Initialize logging when module is imported
 setup_logging()

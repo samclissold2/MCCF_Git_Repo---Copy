@@ -215,3 +215,8 @@ KeyError: 'Terminal Name'
 2025-07-01 14:31:44 - INFO - read_openinfra_existing_generators - OpenInfra existing generators data reading completed in 0.28 seconds
 2025-07-01 14:31:44 - INFO - read_openinfra_existing_generators - Final generator records: 2092
 2025-07-01 14:31:44 - INFO - save_to_cache - Saved read_openinfra_existing_generators data to cache
+2025-07-01 14:33:56 - INFO - save_and_open_map - Starting map saving process
+2025-07-01 14:33:56 - INFO - save_and_open_map - Saving map to C:\Users\SamClissold\MCCF_Git_Repo - Copy\MCCF\PDP8\results\overlap_map.html
+2025-07-01 14:34:19 - INFO - save_and_open_map - Opening map in browser: C:\Users\SamClissold\MCCF_Git_Repo - Copy\MCCF\PDP8\results\overlap_map.html
+2025-07-01 14:34:19 - INFO - save_and_open_map - Map saving and opening completed in 23.46 seconds
+2025-07-01 14:34:19 - INFO - main - Map generation completed in 200.95 seconds
