@@ -1781,25 +1781,25 @@ def create_integrated_map(force_recompute=False):
                 icon=folium.DivIcon(html=f'<div style="font-size:10px; color:{color}; font-weight:bold;">×</div>'),
                 tooltip=f"Substation ({row['voltage_cat']})"
             ).add_to(sub_fg)
-    # Add solar irradiance heatmap to integrated map, toggled off by default
-    solar_df = read_solar_irradiance_points()
-    if solar_df is not None and not solar_df.empty:
-        heat_data = [
-            [row['lat'], row['lon'], row['irradiance']] for _, row in solar_df.iterrows()
-        ]
-        heatmap_layer = HeatMap(
-            heat_data,
-            name="Solar Irradiance Heatmap",
-            min_opacity=0.005,
-            max_opacity=0.015,
-            radius=8,
-            blur=12,
-            gradient={0.2: 'blue', 0.4: 'lime', 0.6: 'yellow', 0.8: 'orange', 1.0: 'red'},
-            show=False
-        )
-        heatmap_fg = folium.FeatureGroup(name="Solar Irradiance Heatmap", show=False)
-        heatmap_fg.add_child(heatmap_layer)
-        m.add_child(heatmap_fg)
+    # # Add solar irradiance heatmap to integrated map, toggled off by default
+    # solar_df = read_solar_irradiance_points()
+    # if solar_df is not None and not solar_df.empty:
+    #     heat_data = [
+    #         [row['lat'], row['lon'], row['irradiance']] for _, row in solar_df.iterrows()
+    #     ]
+    #     heatmap_layer = HeatMap(
+    #         heat_data,
+    #         name="Solar Irradiance Heatmap",
+    #         min_opacity=0.005,
+    #         max_opacity=0.015,
+    #         radius=8,
+    #         blur=12,
+    #         gradient={0.2: 'blue', 0.4: 'lime', 0.6: 'yellow', 0.8: 'orange', 1.0: 'red'},
+    #         show=False
+    #     )
+    #     heatmap_fg = folium.FeatureGroup(name="Solar Irradiance Heatmap", show=False)
+    #     heatmap_fg.add_child(heatmap_layer)
+    #     m.add_child(heatmap_fg)
     
     # Add power projects
     df, name_col = read_and_clean_power_data()
@@ -1858,23 +1858,25 @@ def create_integrated_map(force_recompute=False):
                 elif v >= 25:
                     return '25kV'
                 elif v >= 22:
-                    return '22kV'
+                    return '22kV'   
                 else:
                     return '<22kV'
             except:
                 return 'Unknown'
-        
-        transformer_df['voltage_cat'] = transformer_df['voltage'].apply(voltage_category)
+
+        transformer_df.rename(columns={'voltage': 'voltage_cat'}, inplace=True)
+        transformer_df['voltage_cat'] = transformer_df['voltage_cat'].apply(voltage_category)
         
         # Create feature group for planned transformers
         transformer_fg = folium.FeatureGroup(name="Planned Transformers", show=False).add_to(m)
         
         for _, row in transformer_df.iterrows():
+
             color = voltage_colors.get(row['voltage_cat'], 'black')
             folium.Marker(
                 location=[row['lat'], row['lon']],
                 icon=folium.DivIcon(html=f'<div style="font-size:10px; color:{color}; font-weight:bold;">×</div>'),
-                tooltip=f"Planned Transformer ({voltage_cat}) - {row['name']} - {row['sheet_source']}"
+                tooltip=f"Planned Transformer ({row['voltage_cat']}) - {row['name']} - {row['sheet_source']}"
             ).add_to(transformer_fg)
     
     # Add layer control
