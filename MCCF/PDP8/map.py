@@ -194,8 +194,8 @@ def read_coal_terminal_data(force_recompute=False):
         # Create standardized DataFrame
         logging.info("Standardizing DataFrame format")
         result_df = pd.DataFrame({
-            'name': df['Terminal Name'],
-            'capacity': pd.to_numeric(df['Capacity (Mtpa)'], errors='coerce'),
+            'name': df['Coal Terminal Name'],
+            'capacity': pd.to_numeric(df['Capacity (Mt)'], errors='coerce'),
             'latitude': pd.to_numeric(df['Latitude'], errors='coerce'),
             'longitude': pd.to_numeric(df['Longitude'], errors='coerce'),
             'status': df['Status'] if 'Status' in df.columns else 'Unknown'
@@ -980,38 +980,30 @@ def read_and_clean_power_data(force_recompute=False):
         logging.error(f"Error processing power data: {str(e)}", exc_info=True)
         raise
 
-def read_solar_irradiance_points(force_recompute=False):
+def read_solar_irradiance_points(force_recompute: bool = False):
     """
-    Reads the extracted solar irradiance CSV and returns a DataFrame.
+    Reads (and now caches) extracted solar-irradiance points.
+    Returns a DataFrame with columns  lat / lon / irradiance
     """
-    # Check cache first
     if not force_recompute:
-        cached_data = load_from_cache('read_solar_irradiance_points')
-        if cached_data is not None:
-            return cached_data
-    
-    start_time = time.time()
-    logging.info("Starting solar irradiance data reading")
-    
-    csv_path = DATA_DIR / "extracted_data" / "solar_irradiance_points.csv"
-    if not csv_path.exists():
-        logging.error(f"Solar irradiance CSV not found: {csv_path}")
+        cached = load_from_cache("solar_irradiance_points")
+        if cached is not None:
+            return cached
+
+    start   = time.time()
+    csvpath = DATA_DIR / "extracted_data" / "solar_irradiance_points.csv"
+    if not csvpath.exists():
+        logging.error(f"Solar irradiance CSV not found: {csvpath}")
         return None
-    
+
     try:
-        logging.info(f"Reading solar irradiance data from {csv_path}")
-        df = pd.read_csv(csv_path)
-        logging.info(f"Read {len(df)} solar irradiance points")
-        
-        processing_time = time.time() - start_time
-        logging.info(f"Solar irradiance data reading completed in {processing_time:.2f} seconds")
-        
-        # Save to cache
-        save_to_cache('read_solar_irradiance_points', df)
-        
+        df = pd.read_csv(csvpath)
+        logging.info(f"Read {len(df):,} solar-irradiance points  "
+                     f"in {time.time()-start:,.1f}s")
+        save_to_cache("solar_irradiance_points", df)        # ← NEW
         return df
     except Exception as e:
-        logging.error(f"Error reading solar irradiance data: {str(e)}", exc_info=True)
+        logging.error("Error reading solar irradiance data", exc_info=True)
         return None
 
 def create_folium_map(df):
@@ -1873,59 +1865,33 @@ def read_tif_data(tif_path, sample_rate=0.1):
         print(f"Error reading TIF file {tif_path}: {e}")
         return []
 
-def create_wind_power_density_layer(force_recompute=False):
+def create_wind_power_density_layer(force_recompute: bool = False):
     """
-    Creates a wind power density layer from the TIF file.
-    Returns a HeatMap layer for folium.
+    Creates (and now caches) a Folium HeatMap layer for wind-power-density.
     """
-    # Check cache first
     if not force_recompute:
-        cached_data = load_from_cache('create_wind_power_density_layer')
-        if cached_data is not None:
-            return cached_data
-    
-    tif_path = DATA_DIR / "wind" / "VNM_power-density_100m.tif"
-    
-    if not tif_path.exists():
-        print(f"Wind power density TIF file not found: {tif_path}")
+        cached = load_from_cache("wind_heatmap_layer")
+        if cached is not None:
+            return cached
+
+    tif = DATA_DIR / "wind" / "VNM_power-density_100m.tif"
+    if not tif.exists():
+        logging.error(f"TIF not found: {tif}")
         return None
-    
-    # Read the TIF data with sampling for better performance
-    points = read_tif_data(tif_path, sample_rate=0.05)  # Use 5% of points for better performance
-    
-    if not points:
-        print("No valid data points found in TIF file")
+
+    pts = read_tif_data(tif, sample_rate=0.05)          # 5 % sampling
+    if not pts:
         return None
-    
-    # Normalize values for better visualization
-    values = [point[2] for point in points]
-    min_val, max_val = min(values), max(values)
-    
-    print(f"Wind power density range: {min_val:.2f} - {max_val:.2f} W/m²")
-    
-    # Create heatmap layer with optimized parameters
-    heatmap_layer = HeatMap(
-        points,
-        name="Wind Power Density (100m)",
-        min_opacity=0.2,
-        max_opacity=0.9,
-        radius=20,
-        blur=25,
-        gradient={
-            0.0: 'blue',
-            0.2: 'cyan', 
-            0.4: 'green',
-            0.6: 'yellow',
-            0.8: 'orange',
-            1.0: 'red'
-        },
-        show=True  # Always visible when added directly to map
+
+    heat = HeatMap(
+        pts, name="Wind Power Density (100 m)", show=True,
+        min_opacity=.2, max_opacity=.9, radius=20, blur=25,
+        gradient={0.0: 'blue', 0.2: 'cyan', 0.4: 'green',
+                  0.6: 'yellow', 0.8: 'orange', 1.0: 'red'}
     )
-    
-    # Save to cache
-    save_to_cache('create_wind_power_density_layer', heatmap_layer)
-    
-    return heatmap_layer
+
+    save_to_cache("wind_heatmap_layer", heat)           # ← NEW
+    return heat
 
 def create_wind_power_density_map():
     """
@@ -2114,316 +2080,161 @@ def read_planned_substation_data(force_recompute=False):
         logging.error(f"Error reading transformer data: {str(e)}", exc_info=True)
         return pd.DataFrame()
 
-def asset_analysis(force_recompute=False):
+def create_comprehensive_map(force_recompute: bool = False):
     """
-    Analyzes potential overlaps between GEM data and existing infrastructure data.
-    Creates both an Excel report and a map showing overlapping assets.
-    Groups comparisons by power technology type to identify likely duplicates.
+    Everything from *integrated* map (but no solar-irradiance or wind-heatmap)
+    plus all GEM technology layers, with the LayerControl split into
+        • Existing Assets   • Planned Assets
     """
-    import time
-    start_time = time.time()
-    
-    print("\n=== Starting Asset Analysis ===")
-    
-    # Read GEM data
-    print("\nReading GEM datasets...")
-    gem_datasets = [
-        read_coal_plant_data(force_recompute=force_recompute),
-        read_coal_terminal_data(force_recompute=force_recompute),
-        read_wind_power_data(force_recompute=force_recompute),
-        read_oil_gas_plant_data(force_recompute=force_recompute),
-        read_lng_terminal_data(force_recompute=force_recompute),
-        read_hydropower_data(force_recompute=force_recompute),
-        read_solar_power_data(force_recompute=force_recompute)
-    ]
-    
-    print("\nProcessing GEM datasets...")
-    # Combine all GEM datasets with proper handling of empty/NA columns
-    gem_dfs = [df for df in gem_datasets if not df.empty]
-    if not gem_dfs:
-        print("No valid GEM data found")
-        return None
-    
-    print(f"Found {len(gem_dfs)} non-empty GEM datasets")
-    
-    # Ensure all dataframes have the same columns before concatenation
-    required_columns = ['name', 'type', 'latitude', 'longitude']
-    print("\nStandardizing GEM dataset columns...")
-    for i, df in enumerate(gem_dfs, 1):
-        print(f"Processing dataset {i}/{len(gem_dfs)}...")
-        # Add missing required columns with NA values
-        for col in required_columns:
-            if col not in df.columns:
-                df[col] = pd.NA
-        # Drop any columns that aren't in the required set
-        df = df[required_columns]
-        # Ensure consistent dtypes
-        df['name'] = df['name'].astype(str)
-        df['type'] = df['type'].astype(str)
-        df['latitude'] = pd.to_numeric(df['latitude'], errors='coerce')
-        df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce')
-    
-    print("\nConcatenating GEM datasets...")
-    # Now concatenate the cleaned dataframes
-    gem_df = pd.concat(gem_dfs, ignore_index=True)
-    
-    # Drop any rows with NA in critical columns
-    initial_rows = len(gem_df)
-    gem_df = gem_df.dropna(subset=['latitude', 'longitude'])
-    print(f"Removed {initial_rows - len(gem_df)} rows with missing coordinates")
-    print(f"Final GEM dataset size: {len(gem_df)} rows")
-    
-    print("\nReading infrastructure data...")
-    # Read existing infrastructure data
-    infra_df = read_openinfra_existing_generators(force_recompute=force_recompute)
-    print(f"Infrastructure dataset size: {len(infra_df)} rows")
-    
-    # Define technology type mapping between GEM and OpenInfra datasets
-    technology_mapping = {
-        'Coal Plant': ['coal', 'thermal'],
-        'Coal Terminal': ['coal terminal', 'port'],
-        'Wind Power': ['wind', 'wind power'],
-        'Oil/Gas Plant - Oil': ['oil', 'diesel', 'fuel oil'],
-        'Oil/Gas Plant - Gas': ['gas', 'natural gas', 'lng'],
-        'LNG Terminal': ['lng terminal', 'gas terminal'],
-        'Hydropower Plant': ['hydro', 'hydropower', 'hydroelectric'],
-        'Solar Farm': ['solar', 'pv', 'photovoltaic']
-    }
-    
-    # Function to standardize technology types
-    def get_standard_type(tech_str):
-        tech_str = str(tech_str).lower()
-        for standard_type, variations in technology_mapping.items():
-            if any(var in tech_str for var in variations):
-                return standard_type
-        return 'Other'
-    
-    # Add standardized technology type columns
-    gem_df['standard_type'] = gem_df['type'].apply(get_standard_type)
-    infra_df['standard_type'] = infra_df['source'].apply(get_standard_type)
-    
-    # Function to calculate distance between two points in km
-    def haversine_distance(lat1, lon1, lat2, lon2):
-        R = 6371  # Earth's radius in kilometers
-        
-        lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
-        
-        dlat = lat2 - lat1
-        dlon = lon2 - lon1
-        
-        a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
-        c = 2 * np.arcsin(np.sqrt(a))
-        
-        return R * c
 
-    # Find overlapping assets (within 2km of each other)
-    DISTANCE_THRESHOLD = 2.0  # kilometers
-    overlaps = []
-    
-    print("\nSearching for overlapping assets by technology type...")
-    
-    # Get unique technology types
-    tech_types = set(gem_df['standard_type'].unique()) & set(infra_df['standard_type'].unique())
-    tech_types = [t for t in tech_types if t != 'Other']  # Exclude 'Other' category
-    
-    for tech_type in tech_types:
-        print(f"\nAnalyzing {tech_type}...")
-        
-        # Filter datasets by technology type
-        gem_tech = gem_df[gem_df['standard_type'] == tech_type]
-        infra_tech = infra_df[infra_df['standard_type'] == tech_type]
-        
-        total_comparisons = len(gem_tech) * len(infra_tech)
-        print(f"Comparing {len(gem_tech)} GEM assets with {len(infra_tech)} infrastructure assets")
-        
-        comparison_count = 0
-        last_progress = time.time()
-        
-        for idx1, gem_row in gem_tech.iterrows():
-            for idx2, infra_row in infra_tech.iterrows():
-                comparison_count += 1
-                
-                # Show progress every 5% or if 5 seconds have passed
-                if comparison_count % max(1, total_comparisons // 20) == 0 or time.time() - last_progress >= 5:
-                    progress = (comparison_count / total_comparisons) * 100
-                    elapsed = time.time() - start_time
-                    print(f"Progress: {progress:.1f}% ({comparison_count:,}/{total_comparisons:,} comparisons) - Elapsed time: {elapsed:.1f}s")
-                    last_progress = time.time()
-                
-                distance = haversine_distance(
-                    gem_row['latitude'], gem_row['longitude'],
-                    infra_row['latitude'], infra_row['longitude']
-                )
-                
-                if distance <= DISTANCE_THRESHOLD:
-                    overlaps.append({
-                        'technology_type': tech_type,
-                        'gem_name': gem_row['name'],
-                        'gem_type': gem_row['type'],
-                        'gem_lat': gem_row['latitude'],
-                        'gem_lon': gem_row['longitude'],
-                        'infra_source': infra_row['source'],
-                        'infra_capacity': infra_row['output_mw'],
-                        'infra_lat': infra_row['latitude'],
-                        'infra_lon': infra_row['longitude'],
-                        'distance_km': distance
-                    })
-    
-    print(f"\nCompleted overlap search in {time.time() - start_time:.1f} seconds")
-    
-    if not overlaps:
-        print("No overlapping assets found")
-        return None
-    
-    print("\nCreating output files...")
-    # Create DataFrame of overlaps
-    overlaps_df = pd.DataFrame(overlaps)
-    
-    # Sort by technology type and distance
-    overlaps_df = overlaps_df.sort_values(['technology_type', 'distance_km'])
-    
-    # Save to Excel
-    output_file = RESULTS_DIR / 'asset_overlaps.xlsx'
-    overlaps_df.to_excel(output_file, index=False)
-    print(f"Saved overlap analysis to {output_file}")
-    
-    print("\nCreating visualization map...")
-    # Create map
     m = folium.Map(
-        location=[gem_df['latitude'].mean(), gem_df['longitude'].mean()],
+        location=[16.0, 106.0],
         zoom_start=6,
         tiles="CartoDB Positron",
         attr="© OpenStreetMap, © CartoDB",
     )
-    
-    # Add plugins
-    for Plugin in (Fullscreen, MiniMap, MeasureControl):
-        Plugin().add_to(m)
-    
-    # Create feature groups for different technology types
-    tech_groups = {}
-    for tech_type in tech_types:
-        tech_groups[tech_type] = {
-            'gem': folium.FeatureGroup(name=f"{tech_type} - GEM", show=True),
-            'infra': folium.FeatureGroup(name=f"{tech_type} - Infrastructure", show=True),
-            'lines': folium.FeatureGroup(name=f"{tech_type} - Connections", show=True)
-        }
-    
-    print("Adding markers to map...")
-    # Plot overlapping assets
-    for i, overlap in enumerate(overlaps, 1):
-        if i % 100 == 0:  # Progress for large numbers of overlaps
-            print(f"Added {i}/{len(overlaps)} markers to map")
-        
-        tech_type = overlap['technology_type']
-        groups = tech_groups[tech_type]
-        
-        # Plot GEM asset
-        folium.CircleMarker(
-            location=[overlap['gem_lat'], overlap['gem_lon']],
-            radius=8,
-            color='red',
-            fill=True,
-            popup=f"GEM: {overlap['gem_name']} ({overlap['gem_type']})",
-            tooltip=f"GEM Asset: {overlap['gem_name']}"
-        ).add_to(groups['gem'])
-        
-        # Plot infrastructure asset
-        folium.CircleMarker(
-            location=[overlap['infra_lat'], overlap['infra_lon']],
-            radius=8,
-            color='blue',
-            fill=True,
-            popup=f"Infrastructure: {overlap['infra_source']} ({overlap['infra_capacity']} MW)",
-            tooltip=f"Infrastructure: {overlap['infra_source']}"
-        ).add_to(groups['infra'])
-        
-        # Draw line between overlapping assets
-        folium.PolyLine(
-            locations=[
-                [overlap['gem_lat'], overlap['gem_lon']],
-                [overlap['infra_lat'], overlap['infra_lon']]
-            ],
-            color='yellow',
-            weight=2,
-            opacity=0.8,
-            popup=f"{tech_type}: Distance = {overlap['distance_km']:.2f} km"
-        ).add_to(groups['lines'])
-    
-    # Add all feature groups to map
-    for groups in tech_groups.values():
-        for fg in groups.values():
-            fg.add_to(m)
-    
-    # Add layer control
-    folium.LayerControl(
-        collapsed=True,
-        position='topright',
-        autoZIndex=True
+
+    # ---------- EXISTING  -------------------------------------------------
+    existing_group = "Existing Assets"
+
+    # Transmission lines
+    trans_fg = folium.FeatureGroup(
+        name="Transmission Lines", group=existing_group, show=True
     ).add_to(m)
-    
-    # Create legends
-    overlap_legend_content = '''
-        <div><span style="background:red; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> GEM Asset</div>
-        <div><span style="background:blue; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Infrastructure Asset</div>
-        <div><span style="background:yellow; width:12px; height:4px; display:inline-block;"></span> Overlap Connection</div>
-        <div style="font-size:10px; color:#666; margin-top:6px;">
-            Shows assets within {DISTANCE_THRESHOLD}km of each other
-        </div>
-        <div style="font-size:10px; color:#666; margin-top:6px;">
-            Grouped by technology type
-        </div>
-    '''
-    
-    layer_control_content = '''
-        <div style="margin-bottom:8px;"><strong>Layer Controls</strong></div>
-        <div style="font-size:10px; color:#666;">
-            Toggle layers to show/hide different asset types and their connections
-        </div>
-    '''
-    
-    # Add legends
-    left_legend = create_collapsible_legend(
-        position='left',
-        title='Asset Overlap Legend',
-        content=overlap_legend_content,
-        width=250
+    lines = cache_polylines(
+        get_power_lines(), force_recompute=force_recompute
     )
-    
-    right_legend = create_collapsible_legend(
-        position='right',
-        title='Layer Controls',
-        content=layer_control_content,
-        width=250
+    col = {"500kV": "red", "220kV": "orange", "115kV": "purple",
+           "110kV": "blue"}
+    for f in lines:
+        vcat = f["properties"]["voltage"]
+        folium.PolyLine(
+            [(lat, lon) for lat, lon in f["geometry"]["coordinates"]],
+            color=col.get(vcat, "black"), weight=3, opacity=0.7,
+        ).add_to(trans_fg)
+
+    # Substations
+    subs_fg = folium.FeatureGroup(
+        name="Substations", group=existing_group, show=False
+    ).add_to(m)
+    subs = read_substation_data()
+    for _, r in subs.iterrows():
+        folium.CircleMarker(
+            [r.latitude, r.longitude],
+            radius=4,
+            color="black",
+            fill=True,
+            fill_color=get_voltage_color(r.max_voltage),
+            fill_opacity=0.8,
+            tooltip=f"{r.substation_type} ({r.max_voltage} kV)",
+        ).add_to(subs_fg)
+
+    # GEM datasets (all are existing)
+    gem_df = pd.concat(
+        [
+            read_coal_plant_data(force_recompute),
+            read_coal_terminal_data(force_recompute),
+            read_wind_power_data(force_recompute),
+            read_oil_gas_plant_data(force_recompute),
+            read_lng_terminal_data(force_recompute),
+            read_hydropower_data(force_recompute),
+            read_solar_power_data(force_recompute),
+        ],
+        ignore_index=True,
     )
-    
-    m.get_root().html.add_child(folium.Element(add_legend_control_script()))
-    m.get_root().html.add_child(folium.Element(left_legend))
-    m.get_root().html.add_child(folium.Element(right_legend))
-    
-    # Save map
-    output_map = RESULTS_DIR / 'overlap_map.html'
-    m.save(output_map)
-    print(f"Saved overlap map to {output_map}")
-    
-    # Print summary statistics
-    print("\nOverlap Analysis Summary:")
-    print("\nBy Technology Type:")
-    tech_summary = overlaps_df.groupby('technology_type').agg({
-        'distance_km': ['count', 'mean', 'min', 'max']
-    }).round(2)
-    print(tech_summary)
-    
-    print("\nOverall Statistics:")
-    print(f"Total overlapping pairs found: {len(overlaps)}")
-    print(f"Average distance between overlapping assets: {overlaps_df['distance_km'].mean():.2f} km")
-    print(f"Minimum distance: {overlaps_df['distance_km'].min():.2f} km")
-    print(f"Maximum distance: {overlaps_df['distance_km'].max():.2f} km")
-    
-    total_time = time.time() - start_time
-    print(f"\nTotal analysis time: {total_time:.1f} seconds")
-    
+    tech_colour = {
+        "Solar": "#FF0000",
+        "Hydro": "#003366",
+        "Wind": "#87CEEB",
+        "Coal": "#000000",
+        "Domestic Gas-Fired": "#333333",
+        "LNG-Fired Gas": "#808080",
+        "LNG Terminal": "#D3D3D3",
+        "Coal Terminal": "#8B4513",
+    }
+    for tech in gem_df["type"].unique():
+        fg = folium.FeatureGroup(
+            name=tech, group=existing_group, show=False
+        ).add_to(m)
+        colour = tech_colour.get(tech.split(" - ")[0], "#888888")
+        for _, r in gem_df[gem_df.type == tech].iterrows():
+            folium.CircleMarker(
+                [r.latitude, r.longitude],
+                radius=6,
+                color="#222",
+                opacity=0.3,
+                fill=True,
+                fill_color=colour,
+                fill_opacity=0.8,
+                tooltip=f"{r.name} ({tech})",
+            ).add_to(fg)
+
+    # ---------- PLANNED  --------------------------------------------------
+    planned_group = "Planned Assets"
+
+    # PDP-8 power projects
+    pwr_df, name_col = read_and_clean_power_data(force_recompute)
+    p_cols = {
+        "Solar": "#FF0000",
+        "Hydro": "#003366",
+        "Onshore": "#87CEEB",
+        "LNG-Fired Gas": "#808080",
+        "Domestic Gas-Fired": "#333333",
+    }
+    for tech in pwr_df.tech.unique():
+        for period in pwr_df[pwr_df.tech == tech]["period"].unique():
+            fg = folium.FeatureGroup(
+                name=f"{tech} {period}",
+                group=planned_group,
+                show=False,
+            ).add_to(m)
+            colour = p_cols.get(tech, "#888888")
+            for _, r in pwr_df[(pwr_df.tech == tech) & (pwr_df.period == period)].iterrows():
+                folium.CircleMarker(
+                    [r.lat, r.lon],
+                    radius=max(4, (r.mw ** 0.5) * 0.5),
+                    color="#222",
+                    opacity=0.3,
+                    fill=True,
+                    fill_color=colour,
+                    fill_opacity=0.7,
+                    tooltip=f"{r[name_col]} ({period}) — {r.mw:.0f} MW",
+                ).add_to(fg)
+
+    # Planned substations
+    tr = read_planned_substation_data(force_recompute)
+    if not tr.empty:
+        tr_fg = folium.FeatureGroup(
+            name="Planned Substations", group=planned_group, show=False
+        ).add_to(m)
+        for _, r in tr.iterrows():
+            folium.Marker(
+                [r.lat, r.lon],
+                icon=folium.DivIcon(
+                    html=f'<div style="font-size:10px;'
+                    f'color:{get_voltage_color(r.voltage)};'
+                    f'font-weight:bold;">×</div>'
+                ),
+                tooltip=f"{r.name} ({r.voltage})",
+            ).add_to(tr_fg)
+
+    # ---------- Layer control & cosmetics --------------------------------
+    m.get_root().html.add_child(
+        folium.Element(
+            "<style>"
+            ".leaflet-control-layers-overlays label{font-size:11px}"
+            ".leaflet-control-layers-group-name{font-weight:bold;font-size:12px}"
+            "</style>"
+        )
+    )
+
+    folium.LayerControl(collapsed=True, position="topright").add_to(m)
+
+    for P in (Fullscreen, MeasureControl):
+        P().add_to(m)
+
     return m
+
 
 def main():
     """
@@ -2435,9 +2246,12 @@ def main():
         
         parser = argparse.ArgumentParser(description="Vietnam Power Maps")
         parser.add_argument('--map', choices=[
-             'integrated', 
-            'wind',  'gem', 'overlap',  'all'
-        ], default='power',
+            'integrated',
+            'comprehensive',      # ← NEW
+            'wind',
+            'gem',
+            'all'
+        ], default='integrated',
             help="Type of map to generate")
         parser.add_argument('--force-recompute', action='store_true',
             help="Force recomputation of data (ignore cache)")
@@ -2471,12 +2285,12 @@ def main():
                 if m:
                     save_and_open_map(m, GEM_MAP)
 
-            if args.map in ['overlap', 'all']:
-                logging.info("Generating asset overlap map")
-                m = asset_analysis(force_recompute=args.force_recompute)
+            if args.map in ['comprehensive', 'all']:
+                logging.info("Generating comprehensive map")
+                m = create_comprehensive_map(force_recompute=args.force_recompute)
                 if m:
-                    save_and_open_map(m, RESULTS_DIR / 'overlap_map.html')
-            
+                    save_and_open_map(m, RESULTS_DIR / 'vn_comprehensive_map.html')
+
             total_time = time.time() - start_time
             logging.info(f"Map generation completed in {total_time:.2f} seconds")
 
