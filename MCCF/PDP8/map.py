@@ -2267,32 +2267,45 @@ def asset_analysis(force_recompute=False):
         print(f"\nAnalyzing {tech_type}...")
         
         # Filter datasets by technology type
-        gem_tech = gem_df[gem_df['standard_type'] == tech_type]
-        infra_tech = infra_df[infra_df['standard_type'] == tech_type]
+        gem_tech = gem_df[gem_df['standard_type'] == tech_type].reset_index(drop=True)
+        infra_tech = infra_df[infra_df['standard_type'] == tech_type].reset_index(drop=True)
         
-        total_comparisons = len(gem_tech) * len(infra_tech)
-        print(f"Comparing {len(gem_tech)} GEM assets with {len(infra_tech)} infrastructure assets")
+        if gem_tech.empty or infra_tech.empty:
+            print(f"No data for technology type {tech_type} – skipping.")
+            continue
         
-        comparison_count = 0
-        last_progress = time.time()
+        # --- Optimised spatial matching using BallTree (haversine metric) ---
+        try:
+            from sklearn.neighbors import BallTree
+        except ImportError:
+            print("scikit-learn not installed – falling back to slow pairwise comparison (performance will be degraded).")
+            # Keep original slow path if dependency missing
+            tree_based_match = False
+        else:
+            tree_based_match = True
         
-        for idx1, gem_row in gem_tech.iterrows():
-            for idx2, infra_row in infra_tech.iterrows():
-                comparison_count += 1
-                
-                # Show progress every 5% or if 5 seconds have passed
-                if comparison_count % max(1, total_comparisons // 20) == 0 or time.time() - last_progress >= 5:
-                    progress = (comparison_count / total_comparisons) * 100
-                    elapsed = time.time() - start_time
-                    print(f"Progress: {progress:.1f}% ({comparison_count:,}/{total_comparisons:,} comparisons) - Elapsed time: {elapsed:.1f}s")
-                    last_progress = time.time()
-                
-                distance = haversine_distance(
-                    gem_row['latitude'], gem_row['longitude'],
-                    infra_row['latitude'], infra_row['longitude']
-                )
-                
-                if distance <= DISTANCE_THRESHOLD:
+        if tree_based_match:
+            # Convert coordinates to radians as required by BallTree
+            gem_coords_rad = np.radians(gem_tech[['latitude', 'longitude']].values)
+            infra_coords_rad = np.radians(infra_tech[['latitude', 'longitude']].values)
+
+            # Build BallTree for infrastructure assets (fast O(n log n))
+            infra_tree = BallTree(infra_coords_rad, metric='haversine')
+
+            # Query all GEM points for neighbours within threshold (converted to radians)
+            radius_rad = DISTANCE_THRESHOLD / 6371.0  # Earth radius in km → convert km to radians
+            indices_array, distances_array = infra_tree.query_radius(
+                gem_coords_rad, r=radius_rad, return_distance=True, sort_results=True
+            )
+
+            match_count = 0
+            for gem_idx, (infra_indices, dist_list) in enumerate(zip(indices_array, distances_array)):
+                if len(infra_indices) == 0:
+                    continue
+                gem_row = gem_tech.iloc[gem_idx]
+                for infra_idx, dist_rad in zip(infra_indices, dist_list):
+                    distance_km = dist_rad * 6371.0
+                    infra_row = infra_tech.iloc[infra_idx]
                     overlaps.append({
                         'technology_type': tech_type,
                         'gem_name': gem_row['name'],
@@ -2303,8 +2316,43 @@ def asset_analysis(force_recompute=False):
                         'infra_capacity': infra_row['output_mw'],
                         'infra_lat': infra_row['latitude'],
                         'infra_lon': infra_row['longitude'],
-                        'distance_km': distance
+                        'distance_km': distance_km
                     })
+                    match_count += 1
+            print(f"Found {match_count} overlaps for {tech_type} using BallTree search.")
+        else:
+            # Fallback to original nested loop (kept for compatibility, not optimised)
+            total_comparisons = len(gem_tech) * len(infra_tech)
+            comparison_count = 0
+            last_progress = time.time()
+            for idx1, gem_row in gem_tech.iterrows():
+                for idx2, infra_row in infra_tech.iterrows():
+                    comparison_count += 1
+                    # Show progress every 5% or if 5 seconds have passed
+                    if comparison_count % max(1, total_comparisons // 20) == 0 or time.time() - last_progress >= 5:
+                        progress = (comparison_count / total_comparisons) * 100
+                        elapsed = time.time() - start_time
+                        print(f"Progress: {progress:.1f}% ({comparison_count:,}/{total_comparisons:,} comparisons) - Elapsed time: {elapsed:.1f}s")
+                        last_progress = time.time()
+
+                    distance = haversine_distance(
+                        gem_row['latitude'], gem_row['longitude'],
+                        infra_row['latitude'], infra_row['longitude']
+                    )
+                    if distance <= DISTANCE_THRESHOLD:
+                        overlaps.append({
+                            'technology_type': tech_type,
+                            'gem_name': gem_row['name'],
+                            'gem_type': gem_row['type'],
+                            'gem_lat': gem_row['latitude'],
+                            'gem_lon': gem_row['longitude'],
+                            'infra_source': infra_row['source'],
+                            'infra_capacity': infra_row['output_mw'],
+                            'infra_lat': infra_row['latitude'],
+                            'infra_lon': infra_row['longitude'],
+                            'distance_km': distance
+                        })
+            print(f"Found {len([o for o in overlaps if o['technology_type']==tech_type])} overlaps for {tech_type} using fallback nested search.")
     
     print(f"\nCompleted overlap search in {time.time() - start_time:.1f} seconds")
     
