@@ -1017,105 +1017,6 @@ def create_folium_map(df):
         logging.error(f"Error creating base map: {str(e)}", exc_info=True)
         return None
 
-def add_project_layers(m, df, name_col):
-    start_time = time.time()
-    logging.info("Starting project layer addition")
-    
-    try:
-        tech_colors = {
-            'Solar': '#FF0000',            # red
-            'Hydro': '#003366',            # dark blue
-            'Onshore': '#87CEEB',          # light blue
-            'LNG-Fired Gas': '#D3D3D3',    # light grey
-            'Domestic Gas-Fired': '#333333', # dark grey
-            'Pumped-Storage': '#4682B4',   # medium blue
-            'Nuclear': '#800080',          # purple
-            'Biomass': '#228B22',          # green
-            'Waste-To-Energy': '#8B6F22',  # dirty green/brown
-            'Flexible': '#000000',         # black
-        }
-        
-        # Create period groups
-        periods = ['2025-2030', '2031-2035', '2036-2040', '2041-2045', '2046-2050']
-        
-        logging.info("Creating feature groups")
-        groups = {}
-        for tech in df.tech.unique():
-            for period in df[df.tech == tech]["period"].unique():
-                name = f"{tech} {period}"
-                show = (tech == 'Solar' and period in ['2025-2030', '2031-2035'])
-                fg = folium.FeatureGroup(name=name, show=show).add_to(m)
-                groups[(tech, period)] = fg
-        
-        logging.info("Adding markers to map")
-        marker_count = 0
-        for _, row in df.iterrows():
-            marker_count += 1
-            if marker_count % 100 == 0:
-                logging.info(f"Added {marker_count} markers to map")
-            
-            fg = groups[(row.tech, row["period"])]
-            color = tech_colors.get(row.tech, '#888888')
-            folium.CircleMarker(
-                location=[row.lat, row.lon],
-                radius=max(4, (row.mw ** 0.5) * 0.5),
-                color='#222',
-                opacity=0.3,
-                fill=True,
-                fill_color=color,
-                fill_opacity=0.7,
-                weight=1,
-                tooltip=f"{row[name_col]} ({row.tech}, {row['period']}) — {row.mw:.0f} MW"
-            ).add_to(fg)
-        
-        logging.info(f"Total markers added: {marker_count}")
-        
-        # Add layer control - make it collapsible
-        folium.LayerControl(
-            collapsed=True,  # Make it collapsed by default
-            position='topright',  # Ensure consistent positioning
-            autoZIndex=True  # Maintain proper layer ordering
-        ).add_to(m)
-        
-        # Create legend contents - only technology types legend
-        tech_legend_content = ''.join(
-            f'<div style="margin-bottom:5px;"><span style="background:{color}; width:15px; height:15px; display:inline-block; border-radius:50%; margin-right:5px;"></span> {tech}</div>'
-            for tech, color in tech_colors.items()
-        )
-        
-        size_legend_content = '''
-            <div style="margin-top:10px;">
-                <strong>Project Size</strong><br>
-                <div style="margin:5px 0;">
-                    <span style="background:#888; width:6px; height:6px; display:inline-block; border-radius:50%; margin-right:5px;"></span> Small (&lt;50 MW)
-                </div>
-                <div style="margin:5px 0;">
-                    <span style="background:#888; width:12px; height:12px; display:inline-block; border-radius:50%; margin-right:5px;"></span> Medium (50-200 MW)
-                </div>
-                <div style="margin:5px 0;">
-                    <span style="background:#888; width:18px; height:18px; display:inline-block; border-radius:50%; margin-right:5px;"></span> Large (&gt;200 MW)
-                </div>
-            </div>
-        '''
-        
-        # Add only the technology legend (removed Time Periods legend)
-        left_legend = create_collapsible_legend(
-            position='left',
-            title='Technology Types',
-            content=tech_legend_content + size_legend_content,
-            width=250
-        )
-        
-        # Add legend control script and legend to map
-        m.get_root().html.add_child(folium.Element(add_legend_control_script()))
-        m.get_root().html.add_child(folium.Element(left_legend))
-        
-        return m
-        
-    except Exception as e:
-        logging.error(f"Error adding project layers: {str(e)}", exc_info=True)
-        return None
-
 def save_and_open_map(m, output_file=None):
     start_time = time.time()
     logging.info("Starting map saving process")
@@ -1423,7 +1324,6 @@ def cache_polylines(gdf, cache_file='powerline_polylines.geojson', eps=0.0025, m
     logging.info(f"Saved polylines to {cache_path}")
     return features
 
-
 def create_transmission_map(force_recompute=False):
     """Creates a map showing clustered transmission lines with collapsible legends."""
     start_time = time.time()
@@ -1579,86 +1479,6 @@ def read_substation_data(force_recompute=False):
     except Exception as e:
         logging.error(f"Error reading substation data: {str(e)}", exc_info=True)
         raise
-
-def create_substation_map(force_recompute=False):
-    """Creates a map showing substations with collapsible legends."""
-    df = read_substation_data(force_recompute=force_recompute)
-    if df.empty:
-        print("No substation data found")
-        return None
-    
-    # Filter out rows with NaN voltage values
-    initial_len = len(df)
-    df = df.dropna(subset=['max_voltage'])
-    logging.info(f"Filtered {initial_len - len(df)} rows with NaN voltage values")
-    
-    if df.empty:
-        print("No substation data with valid voltage values found")
-        return None
-    
-    m = create_folium_map(df)
-    
-    # Create feature groups for different voltage levels
-    voltage_groups = {}
-    for voltage in df['max_voltage'].unique():
-        voltage_groups[voltage] = folium.FeatureGroup(name=f"{voltage}kV", show=True).add_to(m)
-    
-    # Add substations
-    for _, row in df.iterrows():
-        voltage = row['max_voltage']
-        color = get_voltage_color(voltage)
-        
-        folium.CircleMarker(
-            location=[row['latitude'], row['longitude']],
-            radius=6,
-            color=color,
-            weight=2,
-            opacity=0.8,
-            fill=True,
-            fill_color=color,
-            fill_opacity=0.6,
-            tooltip=f"Substation: {voltage}kV"
-        ).add_to(voltage_groups[voltage])
-    
-    # Add layer control
-    folium.LayerControl(
-        collapsed=True,
-        position='topright',
-        autoZIndex=True
-    ).add_to(m)
-    
-    # Create legends
-    voltage_legend_content = ''.join(
-        f'<div><span style="background:{get_voltage_color(v)}; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> {v}kV</div>'
-        for v in sorted(df['max_voltage'].unique()) if pd.notna(v)
-    )
-    
-    layer_control_content = '''
-        <div style="margin-bottom:8px;"><strong>Layer Controls</strong></div>
-        <div style="font-size:10px; color:#666;">
-            Toggle layers to show/hide different voltage levels
-        </div>
-    '''
-    
-    # Add legends
-    left_legend = create_collapsible_legend(
-        position='left',
-        title='Substation Voltages',
-        content=voltage_legend_content,
-        width=200
-    )
-    
-    right_legend = create_collapsible_legend(
-        position='right',
-        title='Layer Controls',
-        content=layer_control_content,
-        width=250
-    )
-    
-    m.get_root().html.add_child(folium.Element(left_legend))
-    m.get_root().html.add_child(folium.Element(right_legend))
-    
-    return m
 
 def create_integrated_map(force_recompute=False):
     """
@@ -1888,12 +1708,8 @@ def create_integrated_map(force_recompute=False):
     # Add layer control
     folium.LayerControl(collapsed=False).add_to(m)
     
-    # Add legends
-    # Power line legend
-    powerline_legend = '''
-    <div id="powerline-legend" style="position: fixed; top: 50px; left: 50px; width: 180px; z-index:9999; background: white; border:2px solid grey; border-radius:6px; box-shadow: 2px 2px 6px rgba(0,0,0,0.3); font-size:12px; padding: 8px;">
-      <div style="cursor:pointer;font-weight:bold;" onclick="toggleLegend('powerline-content')">▼ Transmission Line Legend</div>
-      <div id="powerline-content" style="display:block; margin-top:6px;">
+    # Add legends using the standardized collapsible legend system
+    powerline_legend_content = '''
         <div><span style="display:inline-block; width:24px; height:4px; background:red; margin-right:4px;"></span> 500kV Lines</div>
         <div><span style="display:inline-block; width:24px; height:4px; background:orange; margin-right:4px;"></span> 220kV Lines</div>
         <div><span style="display:inline-block; width:24px; height:4px; background:purple; margin-right:4px;"></span> 115kV Lines</div>
@@ -1903,15 +1719,9 @@ def create_integrated_map(force_recompute=False):
         <div><span style="display:inline-block; width:24px; height:4px; background:pink; margin-right:4px;"></span> 25kV Lines</div>
         <div><span style="display:inline-block; width:24px; height:4px; background:gray; margin-right:4px;"></span> 22kV Lines</div>
         <div><span style="display:inline-block; width:24px; height:4px; background:black; margin-right:4px;"></span> <22kV or Unknown Lines</div>
-      </div>
-    </div>
     '''
     
-    # Substation legend
-    substation_legend = '''
-    <div id="substation-legend" style="position: fixed; top: 250px; left: 50px; width: 180px; z-index:9999; background: white; border:2px solid grey; border-radius:6px; box-shadow: 2px 2px 6px rgba(0,0,0,0.3); font-size:12px; padding: 8px;">
-      <div style="cursor:pointer;font-weight:bold;" onclick="toggleLegend('substation-content')">▼ Substation Voltage Legend</div>
-      <div id="legend-content" style="display:block; margin-top:6px;">
+    substation_legend_content = '''
         <div><span style="display:inline-block; width:16px; height:16px; background:red; border-radius:50%; margin-right:4px;"></span> 500kV</div>
         <div><span style="display:inline-block; width:16px; height:16px; background:orange; border-radius:50%; margin-right:4px;"></span> 220kV</div>
         <div><span style="display:inline-block; width:16px; height:16px; background:purple; border-radius:50%; margin-right:4px;"></span> 115kV</div>
@@ -1921,15 +1731,9 @@ def create_integrated_map(force_recompute=False):
         <div><span style="display:inline-block; width:16px; height:16px; background:pink; border-radius:50%; margin-right:4px;"></span> 25kV</div>
         <div><span style="display:inline-block; width:16px; height:16px; background:gray; border-radius:50%; margin-right:4px;"></span> 22kV</div>
         <div><span style="display:inline-block; width:16px; height:16px; background:black; border-radius:50%; margin-right:4px;"></span> <22kV or Unknown</div>
-      </div>
-    </div>
     '''
     
-    # Power project legend
-    project_legend = '''
-    <div id="project-legend" style="position: fixed; top: 400px; left: 50px; width: 180px; z-index:9999; background: white; border:2px solid grey; border-radius:6px; box-shadow: 2px 2px 6px rgba(0,0,0,0.3); font-size:12px; padding: 8px;">
-      <div style="cursor:pointer;font-weight:bold;" onclick="toggleLegend('project-content')">▼ Power Project Legend</div>
-      <div id="project-content" style="display:block; margin-top:6px;">
+    project_legend_content = '''
         <div><span style="background:#FF0000; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Solar</div>
         <div><span style="background:#003366; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Hydro</div>
         <div><span style="background:#87CEEB; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Onshore</div>
@@ -1940,33 +1744,35 @@ def create_integrated_map(force_recompute=False):
         <div><span style="background:#228B22; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Biomass</div>
         <div><span style="background:#8B6F22; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Waste-To-Energy</div>
         <div><span style="background:#000000; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Flexible</div>
-      </div>
-    </div>
     '''
     
-    # JavaScript for legend toggle functionality
-    legend_script = '''
-    <script>
-    function toggleLegend(contentId) {
-        var content = document.getElementById(contentId);
-        var parent = content.parentElement;
-        var header = parent.querySelector('div[onclick]');
-        
-        if (content.style.display === 'none') {
-            content.style.display = 'block';
-            header.innerHTML = header.innerHTML.replace('▶', '▼');
-        } else {
-            content.style.display = 'none';
-            header.innerHTML = header.innerHTML.replace('▼', '▶');
-        }
-    }
-    </script>
-    '''
+    # Create legends using the standardized function
+    powerline_legend = create_collapsible_legend(
+        position='left',
+        title='Transmission Line Legend',
+        content=powerline_legend_content,
+        width=200
+    )
     
+    substation_legend = create_collapsible_legend(
+        position='left',
+        title='Substation Voltage Legend',
+        content=substation_legend_content,
+        width=200
+    )
+    
+    project_legend = create_collapsible_legend(
+        position='left',
+        title='Power Project Legend',
+        content=project_legend_content,
+        width=200
+    )
+    
+    # Add the legend control script and legends to map
+    m.get_root().html.add_child(folium.Element(add_legend_control_script()))
     m.get_root().html.add_child(folium.Element(powerline_legend))
     m.get_root().html.add_child(folium.Element(substation_legend))
     m.get_root().html.add_child(folium.Element(project_legend))
-    m.get_root().html.add_child(folium.Element(legend_script))
     
     return m
 
@@ -2381,107 +2187,6 @@ def read_planned_substation_data(force_recompute=False):
         logging.error(f"Error reading transformer data: {str(e)}", exc_info=True)
         return pd.DataFrame()
 
-def create_new_transformer_map(force_recompute=False):
-    """
-    Creates a map showing planned new transformers from the PDP8 data.
-    """
-    df = read_planned_substation_data(force_recompute=force_recompute)
-    
-    if df.empty:
-        print("No transformer data available for mapping")
-        return None
-    
-    # Create base map
-    m = create_folium_map(df)
-    
-    # Group transformers by voltage category - use same categories as existing substations
-    def voltage_category(val):
-        try:
-            v = float(str(val).replace('kV', '').replace('KV', ''))
-            if v >= 500:
-                return '500kV'
-            elif v >= 220:
-                return '220kV'
-            elif v >= 115:
-                return '115kV'
-            elif v >= 110:
-                return '110kV'
-            elif v >= 50:
-                return '50kV'
-            elif v >= 33:
-                return '33kV'
-            elif v >= 25:
-                return '25kV'
-            elif v >= 22:
-                return '22kV'
-            else:
-                return '<22kV'
-        except:
-            return 'Unknown'
-    
-    # Create feature groups for each voltage category
-    voltage_groups = {}
-    df['voltage_cat'] = df['voltage'].apply(voltage_category)
-    
-    for voltage in sorted(df['voltage_cat'].unique()):
-        voltage_groups[voltage] = folium.FeatureGroup(name=voltage, show=True).add_to(m)
-    
-    # Add transformers to their respective groups
-    for _, row in df.iterrows():
-        voltage = row['voltage_cat']
-        color = get_voltage_color(voltage)
-        
-        folium.CircleMarker(
-            location=[row['lat'], row['lon']],
-            radius=6,
-            color=color,
-            weight=2,
-            opacity=0.8,
-            fill=True,
-            fill_color=color,
-            fill_opacity=0.6,
-            tooltip=f"Transformer: {voltage}"
-        ).add_to(voltage_groups[voltage])
-    
-    # Add layer control
-    folium.LayerControl(
-        collapsed=True,
-        position='topright',
-        autoZIndex=True
-    ).add_to(m)
-    
-    # Create legends
-    voltage_legend_content = ''.join(
-        f'<div><span style="background:{get_voltage_color(v)}; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> {v}</div>'
-        for v in sorted(df['voltage_cat'].unique())
-    )
-    
-    layer_control_content = '''
-        <div style="margin-bottom:8px;"><strong>Layer Controls</strong></div>
-        <div style="font-size:10px; color:#666;">
-            Toggle layers to show/hide different voltage levels
-        </div>
-    '''
-    
-    # Add legends
-    left_legend = create_collapsible_legend(
-        position='left',
-        title='Transformer Voltages',
-        content=voltage_legend_content,
-        width=200
-    )
-    
-    right_legend = create_collapsible_legend(
-        position='right',
-        title='Layer Controls',
-        content=layer_control_content,
-        width=250
-    )
-    
-    m.get_root().html.add_child(folium.Element(left_legend))
-    m.get_root().html.add_child(folium.Element(right_legend))
-    
-    return m
 
 def asset_analysis(force_recompute=False):
     """
@@ -2816,31 +2521,11 @@ def main():
         args = parser.parse_args()
         logging.info(f"Generating map type: {args.map}")
         
-        # Clear cache if requested
+                # Clear cache if requested
         if args.clear_cache:
             clear_cache()
             logging.info("Cache cleared")
-        
         try:
-            if args.map in ['power', 'all']:
-                logging.info("Generating power project map")
-                df, name_col = read_and_clean_power_data(force_recompute=args.force_recompute)
-                m = create_folium_map(df)
-                if m:
-                    add_project_layers(m, df, name_col)
-                    save_and_open_map(m, PROJECTS_MAP)
-
-            if args.map in ['substation', 'all']:
-                logging.info("Generating substation map")
-                m = create_substation_map(force_recompute=args.force_recompute)
-                if m:
-                    save_and_open_map(m, SUBSTATION_MAP)
-
-            if args.map in ['transmission', 'all']:
-                logging.info("Generating transmission map")
-                m = create_transmission_map(force_recompute=args.force_recompute)
-                if m:
-                    save_and_open_map(m, TRANSMISSION_MAP)
 
             if args.map in ['integrated', 'all']:
                 logging.info("Generating integrated map")
@@ -2848,23 +2533,11 @@ def main():
                 if m:
                     save_and_open_map(m, INTEGRATED_MAP)
 
-            if args.map in ['openinfra_existing_generator', 'all']:
-                logging.info("Generating existing generator map")
-                m = create_openinfra_existing_generator_map(force_recompute=args.force_recompute)
-                if m:
-                    save_and_open_map(m, OPENINFRA_EXISTING_GENERATOR_MAP)
-
             if args.map in ['wind', 'all']:
                 logging.info("Generating wind power density map")
                 m = create_wind_power_density_map()
                 if m:
                     save_and_open_map(m, WIND_MAP)
-
-            if args.map in ['new_transformer', 'all']:
-                logging.info("Generating new transformer map")
-                m = create_new_transformer_map(force_recompute=args.force_recompute)
-                if m:
-                    save_and_open_map(m, NEW_TRANSFORMER_MAP)
 
             if args.map in ['gem', 'all']:
                 logging.info("Generating GEM map")
@@ -2877,12 +2550,6 @@ def main():
                 m = asset_analysis(force_recompute=args.force_recompute)
                 if m:
                     save_and_open_map(m, RESULTS_DIR / 'overlap_map.html')
-            
-            if args.map in ['powerline', 'all']:
-                logging.info("Generating powerline map")
-                m = create_powerline_map(force_recompute=args.force_recompute)
-                if m:
-                    save_and_open_map(m, RESULTS_DIR / 'powerline_map.html')
             
             total_time = time.time() - start_time
             logging.info(f"Map generation completed in {total_time:.2f} seconds")
