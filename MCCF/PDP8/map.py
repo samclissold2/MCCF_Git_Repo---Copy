@@ -1626,27 +1626,76 @@ def create_integrated_map(force_recompute=False):
         <div><span style="background:#000000; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Flexible</div>
     '''
     
-    # Create legends using the standardized function with different positions
-    powerline_legend = create_collapsible_legend(
-        position='left',
-        title='Transmission Line Legend',
-        content=powerline_legend_content,
-        width=200
-    )
+    # Create custom legends stacked vertically on the left side with good spacing
+    powerline_legend_id = 'legend-powerline'
+    substation_legend_id = 'legend-substation'
+    project_legend_id = 'legend-project'
     
-    substation_legend = create_collapsible_legend(
-        position='right',
-        title='Substation Voltage Legend',
-        content=substation_legend_content,
-        width=200
-    )
+    powerline_legend = f'''
+    <div id="{powerline_legend_id}" style="
+        position: fixed; 
+        bottom: 50px; 
+        left: 50px; 
+        width: 200px; 
+        z-index:9999; 
+        background: white; 
+        border:2px solid grey; 
+        border-radius:6px; 
+        box-shadow: 2px 2px 6px rgba(0,0,0,0.3); 
+        font-size:12px; 
+        padding: 10px;">
+        <div onclick="toggleLegend('{powerline_legend_id}')" style="cursor:pointer;font-weight:bold;user-select:none;margin-bottom:5px;padding:5px;background:#f8f8f8;border-radius:4px;">
+            Transmission Line Legend <span id="{powerline_legend_id}-arrow" style="float:right;">▶</span>
+        </div>
+        <div id="{powerline_legend_id}-content" style="display:none; margin-top:8px;">
+            {powerline_legend_content}
+        </div>
+    </div>
+    '''
     
-    project_legend = create_collapsible_legend(
-        position='left',
-        title='Power Project Legend',
-        content=project_legend_content,
-        width=200
-    )
+    substation_legend = f'''
+    <div id="{substation_legend_id}" style="
+        position: fixed; 
+        bottom: 300px; 
+        left: 50px; 
+        width: 200px; 
+        z-index:9999; 
+        background: white; 
+        border:2px solid grey; 
+        border-radius:6px; 
+        box-shadow: 2px 2px 6px rgba(0,0,0,0.3); 
+        font-size:12px; 
+        padding: 10px;">
+        <div onclick="toggleLegend('{substation_legend_id}')" style="cursor:pointer;font-weight:bold;user-select:none;margin-bottom:5px;padding:5px;background:#f8f8f8;border-radius:4px;">
+            Substation Voltage Legend <span id="{substation_legend_id}-arrow" style="float:right;">▶</span>
+        </div>
+        <div id="{substation_legend_id}-content" style="display:none; margin-top:8px;">
+            {substation_legend_content}
+        </div>
+    </div>
+    '''
+    
+    project_legend = f'''
+    <div id="{project_legend_id}" style="
+        position: fixed; 
+        bottom: 650px; 
+        left: 50px; 
+        width: 200px; 
+        z-index:9999; 
+        background: white; 
+        border:2px solid grey; 
+        border-radius:6px; 
+        box-shadow: 2px 2px 6px rgba(0,0,0,0.3); 
+        font-size:12px; 
+        padding: 10px;">
+        <div onclick="toggleLegend('{project_legend_id}')" style="cursor:pointer;font-weight:bold;user-select:none;margin-bottom:5px;padding:5px;background:#f8f8f8;border-radius:4px;">
+            Power Project Legend <span id="{project_legend_id}-arrow" style="float:right;">▶</span>
+        </div>
+        <div id="{project_legend_id}-content" style="display:none; margin-top:8px;">
+            {project_legend_content}
+        </div>
+    </div>
+    '''
     
     # Add the legend control script and legends to map
     m.get_root().html.add_child(folium.Element(add_legend_control_script()))
