@@ -32,6 +32,7 @@ from config import (
     OPENINFRA_EXISTING_GENERATOR_MAP,
     OPENINFRA_EXISTING_GENERATOR_DATA
 )
+import rasterio
 
 #test for push
 
@@ -979,10 +980,16 @@ def read_and_clean_power_data(force_recompute=False):
         logging.error(f"Error processing power data: {str(e)}", exc_info=True)
         raise
 
-def read_solar_irradiance_points():
+def read_solar_irradiance_points(force_recompute=False):
     """
     Reads the extracted solar irradiance CSV and returns a DataFrame.
     """
+    # Check cache first
+    if not force_recompute:
+        cached_data = load_from_cache('read_solar_irradiance_points')
+        if cached_data is not None:
+            return cached_data
+    
     start_time = time.time()
     logging.info("Starting solar irradiance data reading")
     
@@ -998,6 +1005,10 @@ def read_solar_irradiance_points():
         
         processing_time = time.time() - start_time
         logging.info(f"Solar irradiance data reading completed in {processing_time:.2f} seconds")
+        
+        # Save to cache
+        save_to_cache('read_solar_irradiance_points', df)
+        
         return df
     except Exception as e:
         logging.error(f"Error reading solar irradiance data: {str(e)}", exc_info=True)
@@ -1515,8 +1526,9 @@ def create_integrated_map(force_recompute=False):
                 icon=folium.DivIcon(html=f'<div style="font-size:10px; color:{color}; font-weight:bold;">×</div>'),
                 tooltip=f"Substation ({row['voltage_cat']})"
             ).add_to(sub_fg)
+
     # # Add solar irradiance heatmap to integrated map, toggled off by default
-    # solar_df = read_solar_irradiance_points()
+    # solar_df = read_solar_irradiance_points(force_recompute=force_recompute)
     # if solar_df is not None and not solar_df.empty:
     #     heat_data = [
     #         [row['lat'], row['lon'], row['irradiance']] for _, row in solar_df.iterrows()
@@ -1602,7 +1614,7 @@ def create_integrated_map(force_recompute=False):
         transformer_df['voltage_cat'] = transformer_df['voltage_cat'].apply(voltage_category)
         
         # Create feature group for planned transformers
-        transformer_fg = folium.FeatureGroup(name="Planned Transformers", show=False).add_to(m)
+        transformer_fg = folium.FeatureGroup(name="Planned Substations", show=False).add_to(m)
         
         for _, row in transformer_df.iterrows():
             # Extract numeric voltage value for color coding directly from voltage_cat
@@ -1620,7 +1632,9 @@ def create_integrated_map(force_recompute=False):
             ).add_to(transformer_fg)
     
     # Add layer control
-    folium.LayerControl(collapsed=False).add_to(m)
+    folium.LayerControl(collapsed=True,
+        position='topright',
+        autoZIndex=True).add_to(m)
     
     # Add legends using the standardized collapsible legend system
     powerline_legend_content = '''
@@ -1658,6 +1672,16 @@ def create_integrated_map(force_recompute=False):
         <div><span style="background:#228B22; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Biomass</div>
         <div><span style="background:#8B6F22; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Waste-To-Energy</div>
         <div><span style="background:#000000; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Flexible</div>
+    '''
+    
+    wind_legend_content = '''
+        <div><span style="display:inline-block; width:24px; height:6px; background:blue; margin-right:6px;"></span> Low (0-200 W/m²)</div>
+        <div><span style="display:inline-block; width:24px; height:6px; background:cyan; margin-right:6px;"></span> Low-Medium (200-400 W/m²)</div>
+        <div><span style="display:inline-block; width:24px; height:6px; background:green; margin-right:6px;"></span> Medium (400-600 W/m²)</div>
+        <div><span style="display:inline-block; width:24px; height:6px; background:yellow; margin-right:6px;"></span> Medium-High (600-800 W/m²)</div>
+        <div><span style="display:inline-block; width:24px; height:6px; background:orange; margin-right:6px;"></span> High (800-1000 W/m²)</div>
+        <div><span style="display:inline-block; width:24px; height:6px; background:red; margin-right:6px;"></span> Very High (>1000 W/m²)</div>
+        <div style="font-size:10px; color:#666; margin-top:6px; border-top:1px solid #ccc; padding-top:6px;">Wind Power Density at 100m height</div>
     '''
     
     # Create custom legends stacked vertically on the left side with good spacing
@@ -1737,134 +1761,63 @@ def create_integrated_map(force_recompute=False):
     m.get_root().html.add_child(folium.Element(substation_legend))
     m.get_root().html.add_child(folium.Element(project_legend))
     
-    return m
-
-def read_openinfra_existing_generators(force_recompute=False):
-    """
-    Reads the dedicated existing generators data file.
-    Returns a DataFrame with the following columns:
-    - source: The source/type of the generator
-    - latitude: Latitude coordinate
-    - longitude: Longitude coordinate
-    - output_mw: Power output in megawatts
-    """
-    # Check cache first
-    if not force_recompute:
-        cached_data = load_from_cache('read_openinfra_existing_generators')
-        if cached_data is not None:
-            return cached_data
-    
-    start_time = time.time()
-    logging.info("Starting OpenInfra existing generators data reading")
-    
-    if not OPENINFRA_EXISTING_GENERATOR_DATA.exists():
-        logging.error(f"Could not find {OPENINFRA_EXISTING_GENERATOR_DATA}")
-        raise FileNotFoundError(f"Could not find {OPENINFRA_EXISTING_GENERATOR_DATA}")
-    
-    try:
-        logging.info(f"Reading generator data from {OPENINFRA_EXISTING_GENERATOR_DATA}")
-        df = pd.read_excel(OPENINFRA_EXISTING_GENERATOR_DATA)
-        logging.info(f"Initial data shape: {df.shape}, Columns: {list(df.columns)}")
+    # # Add wind power density heatmap to integrated map with custom toggle
+    # # Note: HeatMap plugin is not compatible with FeatureGroups, so we add it directly
+    # # and provide a custom toggle button to preserve LayerControl functionality
+    # wind_layer = create_wind_power_density_layer(force_recompute=force_recompute)
+    # if wind_layer is not None:
+    #     # Add wind layer directly to map (not as FeatureGroup to preserve LayerControl)
+    #     # Make it subtle so it doesn't interfere with other layers
+    #     wind_layer.min_opacity = 0.1  # Very low opacity
+    #     wind_layer.max_opacity = 0.3  # Low max opacity
+    #     wind_layer.radius = 15        # Smaller radius
+    #     wind_layer.blur = 20          # More blur for subtlety
+    #     m.add_child(wind_layer)
         
-        # Map actual columns to expected columns
-        column_mapping = {
-            'source': 'source',
-            'latitude': 'latitude', 
-            'longitude': 'longitude',
-            'output': 'output_mw'  # Map 'output' to 'output_mw'
-        }
-        
-        # Check for required columns (using actual column names)
-        actual_required_cols = ['source', 'latitude', 'longitude', 'output']
-        missing_cols = [col for col in actual_required_cols if col not in df.columns]
-        if missing_cols:
-            logging.error(f"Missing required columns: {missing_cols}")
-            raise ValueError(f"Missing required columns in {OPENINFRA_EXISTING_GENERATOR_DATA}: {missing_cols}")
-        
-        # Keep only required columns and rename
-        df = df[actual_required_cols].copy()
-        df = df.rename(columns=column_mapping)
-        logging.info(f"Kept and renamed {len(actual_required_cols)} required columns")
-        
-        processing_time = time.time() - start_time
-        logging.info(f"OpenInfra existing generators data reading completed in {processing_time:.2f} seconds")
-        logging.info(f"Final generator records: {len(df)}")
-        
-        # Save to cache
-        save_to_cache('read_openinfra_existing_generators', df)
-        
-        return df
-        
-    except Exception as e:
-        logging.error(f"Error reading OpenInfra existing generators data: {str(e)}", exc_info=True)
-        raise
-
-def create_openinfra_existing_generator_map(force_recompute=False):
-    """Map for OpenInfra existing generators with collapsible legends."""
-    df = read_openinfra_existing_generators(force_recompute=force_recompute)
-    
-    if df.empty:
-        print("No existing generator data found")
-        return None
-    
-    m = create_folium_map(df)
-    
-    # Create feature groups for each source type
-    source_groups = {}
-    for source in df['source'].unique():
-        source_groups[source] = folium.FeatureGroup(name=source, show=True).add_to(m)
-    
-    # Add markers
-    for _, row in df.iterrows():
-        folium.CircleMarker(
-            location=[row['latitude'], row['longitude']],
-            radius=8,
-            color='#222',
-            weight=1,
-            opacity=0.8,
-            fill=True,
-            fill_color=get_source_color(row['source']),
-            fill_opacity=0.6,
-            tooltip=f"{row['source']}<br>Output: {row['output_mw']} MW"
-        ).add_to(source_groups[row['source']])
-    
-    # Add layer control
-    folium.LayerControl(
-        collapsed=True,
-        position='topright',
-        autoZIndex=True
-    ).add_to(m)
-    
-    # Create legends
-    source_legend_content = ''.join(
-        f'<div><span style="background:{get_source_color(source)}; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> {source}</div>'
-        for source in sorted(df['source'].unique())
-    )
-    
-    layer_control_content = '''
-        <div style="margin-bottom:8px;"><strong>Layer Controls</strong></div>
-        <div style="font-size:10px; color:#666;">
-            Toggle layers to show/hide different generator types
-        </div>
-    '''
-    
-    # Add legends
-    left_legend = create_collapsible_legend(
-        position='left',
-        title='Generator Types',
-        content=source_legend_content,
-        width=250
-    )
-    
-    right_legend = create_collapsible_legend(
-        position='right',
-        title='Layer Controls',
-        content=layer_control_content,
-        width=250
-    )
-    
-    m.get_root().html.add_child(folium.Element(left_legend))
-    m.get_root().html.add_child(folium.Element(right_legend))
+    #     # Add custom wind toggle button
+    #     wind_toggle_html = '''
+    #     <div id="wind-toggle" style="
+    #         position: fixed; 
+    #         top: 120px; 
+    #         right: 50px; 
+    #         z-index: 1000; 
+    #         background: white; 
+    #         border: 2px solid grey; 
+    #         border-radius: 6px; 
+    #         padding: 8px; 
+    #         font-size: 12px; 
+    #         box-shadow: 2px 2px 6px rgba(0,0,0,0.3);">
+    #         <div style="font-weight: bold; margin-bottom: 5px;">Wind Power Density</div>
+    #         <button onclick="toggleWindLayer()" id="wind-toggle-btn" style="
+    #             background: #4CAF50; 
+    #             color: white; 
+    #             border: none; 
+    #             padding: 5px 10px; 
+    #             border-radius: 3px; 
+    #             cursor: pointer; 
+    #             font-size: 11px;">
+    #             Hide Layer
+    #         </button>
+    #     </div>
+    #     <script>
+    #     function toggleWindLayer() {
+    #         const windLayer = document.querySelector('.folium-heatmap-layer');
+    #         const btn = document.getElementById('wind-toggle-btn');
+    #         if (windLayer) {
+    #             if (windLayer.style.display === 'none') {
+    #                 windLayer.style.display = 'block';
+    #                 btn.textContent = 'Hide Layer';
+    #                 btn.style.background = '#4CAF50';
+    #             } else {
+    #                 windLayer.style.display = 'none';
+    #                 btn.textContent = 'Show Layer';
+    #                 btn.style.background = '#f44336';
+    #             }
+    #         }
+    #     }
+    #     </script>
+    #     '''
+    #     m.get_root().html.add_child(folium.Element(wind_toggle_html))
     
     return m
 
@@ -1920,11 +1873,17 @@ def read_tif_data(tif_path, sample_rate=0.1):
         print(f"Error reading TIF file {tif_path}: {e}")
         return []
 
-def create_wind_power_density_layer():
+def create_wind_power_density_layer(force_recompute=False):
     """
     Creates a wind power density layer from the TIF file.
     Returns a HeatMap layer for folium.
     """
+    # Check cache first
+    if not force_recompute:
+        cached_data = load_from_cache('create_wind_power_density_layer')
+        if cached_data is not None:
+            return cached_data
+    
     tif_path = DATA_DIR / "wind" / "VNM_power-density_100m.tif"
     
     if not tif_path.exists():
@@ -1960,8 +1919,11 @@ def create_wind_power_density_layer():
             0.8: 'orange',
             1.0: 'red'
         },
-        show=True  # Start with the layer ON for the dedicated wind map
+        show=True  # Always visible when added directly to map
     )
+    
+    # Save to cache
+    save_to_cache('create_wind_power_density_layer', heatmap_layer)
     
     return heatmap_layer
 
@@ -1982,8 +1944,10 @@ def create_wind_power_density_map():
         Plugin().add_to(m)
     
     # Create wind power density layer
-    wind_layer = create_wind_power_density_layer()
+    wind_layer = create_wind_power_density_layer(force_recompute=False)
     if wind_layer is not None:
+        # For the dedicated wind map, we want the layer to be visible by default
+        wind_layer.show = True
         # Add the wind layer directly to the map (not as a FeatureGroup)
         m.add_child(wind_layer)
         
@@ -2149,7 +2113,6 @@ def read_planned_substation_data(force_recompute=False):
     except Exception as e:
         logging.error(f"Error reading transformer data: {str(e)}", exc_info=True)
         return pd.DataFrame()
-
 
 def asset_analysis(force_recompute=False):
     """
@@ -2472,8 +2435,8 @@ def main():
         
         parser = argparse.ArgumentParser(description="Vietnam Power Maps")
         parser.add_argument('--map', choices=[
-            'power', 'substation', 'transmission', 'integrated', 'openinfra_existing_generator', 
-            'wind', 'new_transformer', 'gem', 'overlap', 'powerline', 'all'
+             'integrated', 
+            'wind',  'gem', 'overlap',  'all'
         ], default='power',
             help="Type of map to generate")
         parser.add_argument('--force-recompute', action='store_true',
