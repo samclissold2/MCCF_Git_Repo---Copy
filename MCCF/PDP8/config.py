@@ -34,6 +34,7 @@ OPENINFRA_EXISTING_GENERATOR_MAP = RESULTS_DIR / "vn_openinfra_existing_generato
 KEPLER_POWER_MAP = RESULTS_DIR / "kepler_power_map.html"
 KEPLER_SUBSTATION_MAP = RESULTS_DIR / "kepler_substation_map.html"
 KEPLER_TRANSMISSION_MAP = RESULTS_DIR / "kepler_transmission_map.html"
+KEPLER_COMPREHENSIVE_MAP = RESULTS_DIR / "kepler_comprehensive_map.html"
 
 # Create directories if they don't exist
 DATA_DIR.mkdir(exist_ok=True)

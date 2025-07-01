@@ -1184,7 +1184,6 @@ def cache_polylines(gdf, cache_file='powerline_polylines.geojson', eps=0.0025, m
         gdf['voltage_cat'] = gdf['max_voltage'].apply(voltage_category)
     else:
         gdf['voltage_cat'] = 'Unknown'
-    breakpoint()
     voltage_groups = gdf.groupby('voltage_cat')
     
     for voltage_cat, group in voltage_groups:
