@@ -32,7 +32,29 @@ from config import (
     OPENINFRA_EXISTING_GENERATOR_MAP,
     OPENINFRA_EXISTING_GENERATOR_DATA
 )
-from . import map_utils as utils
+
+# Attempt relative import first (works when executed with "python -m MCCF.PDP8.create_map")
+# but gracefully fall back to absolute import paths when the file is run as a
+# standalone script (e.g. "python MCCF/PDP8/create_map.py").
+try:
+    from . import map_utils as utils  # Package-relative import
+except ImportError:  # pragma: no cover – stand-alone execution fallback
+    import importlib
+    import sys
+
+    # Ensure the project root (two levels up) is on sys.path so that the
+    # absolute package import below succeeds.
+    _current_dir = os.path.dirname(os.path.abspath(__file__))        # …/MCCF/PDP8
+    _project_root = os.path.dirname(os.path.dirname(_current_dir))   # …/ (repo root)
+    if _project_root not in sys.path:
+        sys.path.insert(0, _project_root)
+
+    try:
+        # Try absolute import via package hierarchy
+        utils = importlib.import_module("MCCF.PDP8.map_utils")
+    except ModuleNotFoundError:
+        # Last-ditch: import the module by filename (same directory)
+        utils = importlib.import_module("map_utils")
 
 def create_gem_map(force_recompute=False):
     """
@@ -461,16 +483,6 @@ def create_integrated_map(force_recompute=False):
         <div><span style="background:#000000; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Flexible</div>
     '''
     
-    wind_legend_content = '''
-        <div><span style="display:inline-block; width:24px; height:6px; background:blue; margin-right:6px;"></span> Low (0-200 W/m²)</div>
-        <div><span style="display:inline-block; width:24px; height:6px; background:cyan; margin-right:6px;"></span> Low-Medium (200-400 W/m²)</div>
-        <div><span style="display:inline-block; width:24px; height:6px; background:green; margin-right:6px;"></span> Medium (400-600 W/m²)</div>
-        <div><span style="display:inline-block; width:24px; height:6px; background:yellow; margin-right:6px;"></span> Medium-High (600-800 W/m²)</div>
-        <div><span style="display:inline-block; width:24px; height:6px; background:orange; margin-right:6px;"></span> High (800-1000 W/m²)</div>
-        <div><span style="display:inline-block; width:24px; height:6px; background:red; margin-right:6px;"></span> Very High (>1000 W/m²)</div>
-        <div style="font-size:10px; color:#666; margin-top:6px; border-top:1px solid #ccc; padding-top:6px;">Wind Power Density at 100m height</div>
-    '''
-    
     # Create custom legends stacked vertically on the left side with good spacing
     powerline_legend_id = 'legend-powerline'
     substation_legend_id = 'legend-substation'
@@ -684,36 +696,116 @@ def create_comprehensive_map(force_recompute: bool = False):
     existing_group = "Existing Assets"
 
     # Transmission lines
-    trans_fg = folium.FeatureGroup(
-        name="Transmission Lines", group=existing_group, show=True
-    ).add_to(m)
-    lines = utils.cache_polylines(
-        utils.get_power_lines(), force_recompute=force_recompute
-    )
-    col = {"500kV": "red", "220kV": "orange", "115kV": "purple",
-           "110kV": "blue"}
-    for f in lines:
-        vcat = f["properties"]["voltage"]
+    # Add power lines
+    gdf = utils.get_power_lines()
+    def voltage_category(val):
+        try:
+            v = float(val)
+            if v >= 500000:
+                return '500kV'
+            elif v >= 220000:
+                return '220kV'
+            elif v >= 115000:
+                return '115kV'
+            elif v >= 110000:
+                return '110kV'
+            elif v >= 50000:
+                return '50kV'
+            elif v >= 33000:
+                return '33kV'
+            elif v >= 25000:
+                return '25kV'
+            elif v >= 22000:
+                return '22kV'
+            else:
+                return '<22kV'
+        except:
+            return 'Unknown'
+    if 'max_voltage' in gdf.columns:
+        gdf['voltage_cat'] = gdf['max_voltage'].apply(voltage_category)
+    else:
+        gdf['voltage_cat'] = 'Unknown'
+    features = utils.cache_polylines(gdf, cache_file='powerline_polylines.geojson', eps=0.0025, min_samples=3, force_recompute=force_recompute)
+    voltage_colors = {
+        '500kV': 'red',
+        '220kV': 'orange',
+        '115kV': 'purple',
+        '110kV': 'blue',
+        '50kV': 'green',
+        '33kV': 'brown',
+        '25kV': 'pink',
+        '22kV': 'gray',
+        '<22kV': 'black',
+        'Unknown': 'black',
+    }
+    
+    # Add power lines as a toggleable FeatureGroup
+    transmission_fg = folium.FeatureGroup(name="Transmission Lines", show=True).add_to(m)
+    for feat in features:
+        coords = feat['geometry']['coordinates']
+        voltage = feat['properties']['voltage']
+        color = voltage_colors.get(voltage, 'black')
         folium.PolyLine(
-            [(lat, lon) for lat, lon in f["geometry"]["coordinates"]],
-            color=col.get(vcat, "black"), weight=3, opacity=0.7,
-        ).add_to(trans_fg)
+            locations=[(lat, lon) for lat, lon in coords],
+            color=color,
+            weight=4,
+            opacity=0.7,
+            tooltip=f"{voltage} Line (Cluster {feat['properties']['cluster']})"
+        ).add_to(transmission_fg)
+    
+    # Add substations
+    sdf = utils.read_substation_data()
+    sdf = sdf[sdf['substation_type'].notna() & (sdf['substation_type'].astype(str).str.strip() != '')]
+    # 3. Bucket substations by max_voltage and assign colors
+    def voltage_category(val):
+        try:
+            v = float(val)
+            if v >= 500000:
+                return '500kV'
+            elif v >= 220000:
+                return '220kV'
+            elif v >= 115000:
+                return '115kV'
+            elif v >= 110000:
+                return '110kV'
+            elif v >= 50000:
+                return '50kV'
+            elif v >= 33000:
+                return '33kV'
+            elif v >= 25000:
+                return '25kV'
+            elif v >= 22000:
+                return '22kV'
+            else:
+                return '<22kV'
+        except:
+            return 'Unknown'
+    if 'max_voltage' in sdf.columns:
+        sdf['voltage_cat'] = sdf['max_voltage'].apply(voltage_category)
+    else:
+        sdf['voltage_cat'] = 'Unknown'
+    voltage_colors = {
+        '500kV': 'red',
+        '220kV': 'orange',
+        '115kV': 'purple',
+        '110kV': 'blue',
+        '50kV': 'green',
+        '33kV': 'brown',
+        '25kV': 'pink',
+        '22kV': 'gray',
+        '<22kV': 'black',
+        'Unknown': 'black',
+    }
+    if not sdf.empty:
+        sub_fg = folium.FeatureGroup(name="Substations", show=False).add_to(m)
+        for _, row in sdf.iterrows():
+            color = voltage_colors.get(row['voltage_cat'], 'black')
+            folium.Marker(
+                location=[row['latitude'], row['longitude']],
+                icon=folium.DivIcon(html=f'<div style="font-size:10px; color:{color}; font-weight:bold;">×</div>'),
+                tooltip=f"Substation ({row['voltage_cat']})"
+            ).add_to(sub_fg)
 
-    # Substations
-    subs_fg = folium.FeatureGroup(
-        name="Substations", group=existing_group, show=False
-    ).add_to(m)
-    subs = utils.read_substation_data()
-    for _, r in subs.iterrows():
-        folium.CircleMarker(
-            [r.latitude, r.longitude],
-            radius=4,
-            color="black",
-            fill=True,
-            fill_color=utils.get_voltage_color(r.max_voltage),
-            fill_opacity=0.8,
-            tooltip=f"{r.substation_type} ({r.max_voltage} kV)",
-        ).add_to(subs_fg)
 
     # GEM datasets (all are existing)
     gem_df = pd.concat(
@@ -728,6 +820,19 @@ def create_comprehensive_map(force_recompute: bool = False):
         ],
         ignore_index=True,
     )
+    
+    type_mapping = {
+        'Coal Plant': 'Coal',
+        'Wind Power': 'Wind',
+        'Oil/Gas Plant - fossil gas: natural gas': "Domestic Gas-Fired",
+        'Oil/Gas Plant - fossil gas: LNG': "LNG-Fired Gas",
+        'Oil/Gas Plant - fossil gas: natural gas, fossil liquids: fuel oil': 'Domestic Gas-fired/Fuel Oil',
+        'Hydropower Plant': 'Hydro',
+        'Solar Farm': 'Solar'
+    }
+
+    gem_df['type'] = gem_df['type'].map(type_mapping).fillna(gem_df['type'])
+
     tech_colour = {
         "Solar": "#FF0000",
         "Hydro": "#003366",
@@ -738,21 +843,29 @@ def create_comprehensive_map(force_recompute: bool = False):
         "LNG Terminal": "#D3D3D3",
         "Coal Terminal": "#8B4513",
     }
+    # Scale GEM marker sizes by capacity (larger capacity → larger radius)
+    gem_max_cap = gem_df["capacity"].max(skipna=True)
+    min_r, max_r = 4, 12  # radius bounds
+
     for tech in gem_df["type"].unique():
-        fg = folium.FeatureGroup(
-            name=tech, group=existing_group, show=False
-        ).add_to(m)
-        colour = tech_colour.get(tech.split(" - ")[0], "#888888")
-        for _, r in gem_df[gem_df.type == tech].iterrows():
+        fg = folium.FeatureGroup(name=tech, show=False).add_to(m)
+        colour = tech_colour.get(tech, '#888888')
+        tech_df = gem_df[gem_df.type == tech]
+        if tech_df.empty:
+            continue
+        max_cap = tech_df.capacity.max(skipna=True)
+        for _, row in tech_df.iterrows():
+            cap = row.capacity if pd.notna(row.capacity) else 0
+            rad = min_r if max_cap == 0 else min_r + (cap / max_cap) * (max_r - min_r)
             folium.CircleMarker(
-                [r.latitude, r.longitude],
-                radius=6,
-                color="#222",
+                location=[row.latitude, row.longitude],
+                radius=rad,
+                color='#222',  # faint outline
                 opacity=0.3,
                 fill=True,
                 fill_color=colour,
-                fill_opacity=0.8,
-                tooltip=f"{r.name} ({tech})",
+                fill_opacity=0.4,
+                tooltip=f"{row.name} - {row.capacity} - {row.status}"
             ).add_to(fg)
 
     # ---------- PLANNED  --------------------------------------------------
@@ -775,45 +888,194 @@ def create_comprehensive_map(force_recompute: bool = False):
                 show=False,
             ).add_to(m)
             colour = p_cols.get(tech, "#888888")
-            for _, r in pwr_df[(pwr_df.tech == tech) & (pwr_df.period == period)].iterrows():
+            # Pre-compute max MW for scaling
+            period_df = pwr_df[(pwr_df.tech == tech) & (pwr_df.period == period)]
+            if period_df.empty:
+                continue
+            max_mw = period_df.mw.max(skipna=True)
+            for _, r in period_df.iterrows():
+                mw = r.mw if pd.notna(r.mw) else 0
+                rad = min_r if max_mw == 0 else min_r + (mw / max_mw) * (max_r - min_r)
                 folium.CircleMarker(
                     [r.lat, r.lon],
-                    radius=max(4, (r.mw ** 0.5) * 0.5),
+                    radius=rad,
                     color="#222",
                     opacity=0.3,
                     fill=True,
                     fill_color=colour,
-                    fill_opacity=0.7,
+                    fill_opacity=1.0,
                     tooltip=f"{r[name_col]} ({period}) — {r.mw:.0f} MW",
                 ).add_to(fg)
 
     # Planned substations
-    tr = utils.read_planned_substation_data(force_recompute)
-    if not tr.empty:
-        tr_fg = folium.FeatureGroup(
-            name="Planned Substations", group=planned_group, show=False
-        ).add_to(m)
-        for _, r in tr.iterrows():
+    # Add planned transformers
+    transformer_df = utils.read_planned_substation_data()
+    if not transformer_df.empty:
+        # Group transformers by voltage category - use same categories as existing substations
+        def voltage_category(val):
+            try:
+                v = float(str(val).replace('kV', '').replace('KV', ''))
+                if v >= 500:
+                    return '500kV'
+                elif v >= 220:
+                    return '220kV'
+                elif v >= 115:
+                    return '115kV'
+                elif v >= 110:
+                    return '110kV'
+                elif v >= 50:
+                    return '50kV'
+                elif v >= 33:
+                    return '33kV'
+                elif v >= 25:
+                    return '25kV'
+                elif v >= 22:
+                    return '22kV'   
+                else:
+                    return '<22kV'
+            except:
+                return 'Unknown'
+
+        transformer_df.rename(columns={'voltage': 'voltage_cat'}, inplace=True)
+        transformer_df['voltage_cat'] = transformer_df['voltage_cat'].apply(voltage_category)
+        
+        # Create feature group for planned transformers
+        transformer_fg = folium.FeatureGroup(name="Planned Substations", show=False).add_to(m)
+        
+        for _, row in transformer_df.iterrows():
+            # Extract numeric voltage value for color coding directly from voltage_cat
+            try:
+                numeric_voltage = float(str(row['voltage_cat']).replace('kV', '').replace('KV', ''))
+            except:
+                numeric_voltage = 'unknown'
+            
+            # Use the same color coding system as substation map
+            color = utils.get_voltage_color(numeric_voltage)
             folium.Marker(
-                [r.lat, r.lon],
-                icon=folium.DivIcon(
-                    html=f'<div style="font-size:10px;'
-                    f'color:{utils.get_voltage_color(r.voltage)};'
-                    f'font-weight:bold;">×</div>'
-                ),
-                tooltip=f"{r.name} ({r.voltage})",
-            ).add_to(tr_fg)
-
-    # ---------- Layer control & cosmetics --------------------------------
-    m.get_root().html.add_child(
-        folium.Element(
-            "<style>"
-            ".leaflet-control-layers-overlays label{font-size:11px}"
-            ".leaflet-control-layers-group-name{font-weight:bold;font-size:12px}"
-            "</style>"
-        )
-    )
-
+                location=[row['lat'], row['lon']],
+                icon=folium.DivIcon(html=f'<div style="font-size:10px; color:{color}; font-weight:bold;">×</div>'),
+                tooltip=f"Planned Transformer ({row['voltage_cat']}) - {row['name']} - {row['sheet_source']}"
+            ).add_to(transformer_fg)
+    
+    # Add layer control
+    folium.LayerControl(collapsed=True,
+        position='topright',
+        autoZIndex=True).add_to(m)
+    
+    # Add legends using the standardized collapsible legend system
+    powerline_legend_content = '''
+        <div><span style="display:inline-block; width:24px; height:4px; background:red; margin-right:4px;"></span> 500kV Lines</div>
+        <div><span style="display:inline-block; width:24px; height:4px; background:orange; margin-right:4px;"></span> 220kV Lines</div>
+        <div><span style="display:inline-block; width:24px; height:4px; background:purple; margin-right:4px;"></span> 115kV Lines</div>
+        <div><span style="display:inline-block; width:24px; height:4px; background:blue; margin-right:4px;"></span> 110kV Lines</div>
+        <div><span style="display:inline-block; width:24px; height:4px; background:green; margin-right:4px;"></span> 50kV Lines</div>
+        <div><span style="display:inline-block; width:24px; height:4px; background:brown; margin-right:4px;"></span> 33kV Lines</div>
+        <div><span style="display:inline-block; width:24px; height:4px; background:pink; margin-right:4px;"></span> 25kV Lines</div>
+        <div><span style="display:inline-block; width:24px; height:4px; background:gray; margin-right:4px;"></span> 22kV Lines</div>
+        <div><span style="display:inline-block; width:24px; height:4px; background:black; margin-right:4px;"></span> <22kV or Unknown Lines</div>
+    '''
+    
+    substation_legend_content = '''
+        <div><span style="display:inline-block; width:16px; height:16px; background:red; border-radius:50%; margin-right:4px;"></span> 500kV</div>
+        <div><span style="display:inline-block; width:16px; height:16px; background:orange; border-radius:50%; margin-right:4px;"></span> 220kV</div>
+        <div><span style="display:inline-block; width:16px; height:16px; background:purple; border-radius:50%; margin-right:4px;"></span> 115kV</div>
+        <div><span style="display:inline-block; width:16px; height:16px; background:blue; border-radius:50%; margin-right:4px;"></span> 110kV</div>
+        <div><span style="display:inline-block; width:16px; height:16px; background:green; border-radius:50%; margin-right:4px;"></span> 50kV</div>
+        <div><span style="display:inline-block; width:16px; height:16px; background:brown; border-radius:50%; margin-right:4px;"></span> 33kV</div>
+        <div><span style="display:inline-block; width:16px; height:16px; background:pink; border-radius:50%; margin-right:4px;"></span> 25kV</div>
+        <div><span style="display:inline-block; width:16px; height:16px; background:gray; border-radius:50%; margin-right:4px;"></span> 22kV</div>
+        <div><span style="display:inline-block; width:16px; height:16px; background:black; border-radius:50%; margin-right:4px;"></span> <22kV or Unknown</div>
+    '''
+    
+    project_legend_content = '''
+        <div><span style="background:#FF0000; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Solar</div>
+        <div><span style="background:#003366; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Hydro</div>
+        <div><span style="background:#87CEEB; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Onshore</div>
+        <div><span style="background:#D3D3D3; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> LNG-Fired Gas</div>
+        <div><span style="background:#333333; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Domestic Gas-Fired</div>
+        <div><span style="background:#4682B4; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Pumped-Storage</div>
+        <div><span style="background:#800080; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Nuclear</div>
+        <div><span style="background:#228B22; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Biomass</div>
+        <div><span style="background:#8B6F22; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Waste-To-Energy</div>
+        <div><span style="background:#000000; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Flexible</div>
+    '''
+    
+    # Create custom legends stacked vertically on the left side with good spacing
+    powerline_legend_id = 'legend-powerline'
+    substation_legend_id = 'legend-substation'
+    project_legend_id = 'legend-project'
+    
+    powerline_legend = f'''
+    <div id="{powerline_legend_id}" style="
+        position: fixed; 
+        bottom: 50px; 
+        left: 50px; 
+        width: 200px; 
+        z-index:9999; 
+        background: white; 
+        border:2px solid grey; 
+        border-radius:6px; 
+        box-shadow: 2px 2px 6px rgba(0,0,0,0.3); 
+        font-size:12px; 
+        padding: 10px;">
+        <div onclick="toggleLegend('{powerline_legend_id}')" style="cursor:pointer;font-weight:bold;user-select:none;margin-bottom:5px;padding:5px;background:#f8f8f8;border-radius:4px;">
+            Transmission Line Legend <span id="{powerline_legend_id}-arrow" style="float:right;">▶</span>
+        </div>
+        <div id="{powerline_legend_id}-content" style="display:none; margin-top:8px;">
+            {powerline_legend_content}
+        </div>
+    </div>
+    '''
+    
+    substation_legend = f'''
+    <div id="{substation_legend_id}" style="
+        position: fixed; 
+        bottom: 300px; 
+        left: 50px; 
+        width: 200px; 
+        z-index:9999; 
+        background: white; 
+        border:2px solid grey; 
+        border-radius:6px; 
+        box-shadow: 2px 2px 6px rgba(0,0,0,0.3); 
+        font-size:12px; 
+        padding: 10px;">
+        <div onclick="toggleLegend('{substation_legend_id}')" style="cursor:pointer;font-weight:bold;user-select:none;margin-bottom:5px;padding:5px;background:#f8f8f8;border-radius:4px;">
+            Substation Voltage Legend <span id="{substation_legend_id}-arrow" style="float:right;">▶</span>
+        </div>
+        <div id="{substation_legend_id}-content" style="display:none; margin-top:8px;">
+            {substation_legend_content}
+        </div>
+    </div>
+    '''
+    
+    project_legend = f'''
+    <div id="{project_legend_id}" style="
+        position: fixed; 
+        bottom: 650px; 
+        left: 50px; 
+        width: 200px; 
+        z-index:9999; 
+        background: white; 
+        border:2px solid grey; 
+        border-radius:6px; 
+        box-shadow: 2px 2px 6px rgba(0,0,0,0.3); 
+        font-size:12px; 
+        padding: 10px;">
+        <div onclick="toggleLegend('{project_legend_id}')" style="cursor:pointer;font-weight:bold;user-select:none;margin-bottom:5px;padding:5px;background:#f8f8f8;border-radius:4px;">
+            Power Project Legend <span id="{project_legend_id}-arrow" style="float:right;">▶</span>
+        </div>
+        <div id="{project_legend_id}-content" style="display:none; margin-top:8px;">
+            {project_legend_content}
+        </div>
+    </div>
+    '''
+    
+    # Add the legend control script and legends to map
+    m.get_root().html.add_child(folium.Element(utils.add_legend_control_script()))
+    m.get_root().html.add_child(folium.Element(powerline_legend))
+    m.get_root().html.add_child(folium.Element(substation_legend))
+    m.get_root().html.add_child(folium.Element(project_legend))
     folium.LayerControl(collapsed=True, position="topright").add_to(m)
 
     for P in (Fullscreen, MeasureControl):

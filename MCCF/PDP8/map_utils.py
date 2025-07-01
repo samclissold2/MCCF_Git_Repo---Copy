@@ -1156,6 +1156,35 @@ def cache_polylines(gdf, cache_file='powerline_polylines.geojson', eps=0.0025, m
         return features
     
     # Group power lines by voltage category
+
+    def voltage_category(val):
+        try:
+            v = float(val)
+            if v >= 500000:
+                return '500kV'
+            elif v >= 220000:
+                return '220kV'
+            elif v >= 115000:
+                return '115kV'
+            elif v >= 110000:
+                return '110kV'
+            elif v >= 50000:
+                return '50kV'
+            elif v >= 33000:
+                return '33kV'
+            elif v >= 25000:
+                return '25kV'
+            elif v >= 22000:
+                return '22kV'
+            else:
+                return '<22kV'
+        except:
+            return 'Unknown'
+    if 'max_voltage' in gdf.columns:
+        gdf['voltage_cat'] = gdf['max_voltage'].apply(voltage_category)
+    else:
+        gdf['voltage_cat'] = 'Unknown'
+    breakpoint()
     voltage_groups = gdf.groupby('voltage_cat')
     
     for voltage_cat, group in voltage_groups:
