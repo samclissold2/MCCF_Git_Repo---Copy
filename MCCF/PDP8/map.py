@@ -1313,115 +1313,6 @@ def cache_polylines(gdf, cache_file='powerline_polylines.geojson', eps=0.0025, m
     logging.info(f"Saved polylines to {cache_path}")
     return features
 
-def create_transmission_map(force_recompute=False):
-    """Creates a map showing clustered transmission lines with collapsible legends."""
-    start_time = time.time()
-    logging.info("Starting transmission map creation")
-    
-    # Get clustered powerline data
-    powerline_features = read_powerline_data(force_recompute=force_recompute)
-    
-    if not powerline_features:
-        print("No transmission line data found")
-        return None
-    
-    # Create base map
-    m = folium.Map(
-        location=[16.0, 106.0],  # Center of Vietnam
-        zoom_start=6,
-        tiles="CartoDB Positron",
-        attr="© OpenStreetMap, © CartoDB",
-    )
-    
-    # Add plugins
-    for Plugin in (Fullscreen, MeasureControl):
-        Plugin().add_to(m)
-    
-    voltage_colors = {
-        '500kV': '#FF0000',    # Red
-        '220kV': '#FFA500',    # Orange
-        '115kV': '#800080',    # Purple
-        '110kV': '#0000FF',    # Blue
-        '50kV': '#008000',     # Green
-        '33kV': '#A52A2A',     # Brown
-        '25kV': '#FFC0CB',     # Pink
-        '22kV': '#808080',     # Gray
-        '<22kV': '#000000',    # Black
-        'Unknown': '#000000',  # Black
-    }
-    
-    # Create feature groups for different voltage levels
-    voltage_groups = {}
-    voltages_present = set()
-    
-    # First pass to identify which voltages are present
-    for feat in powerline_features:
-        voltage = feat['properties']['voltage']
-        voltages_present.add(voltage)
-    
-    # Create feature groups only for voltages that are present
-    for voltage in voltages_present:
-        voltage_groups[voltage] = folium.FeatureGroup(name=f"{voltage}", show=True).add_to(m)
-    
-    # Add clustered transmission lines
-    for feat in powerline_features:
-        coords = feat['geometry']['coordinates']
-        voltage = feat['properties']['voltage']
-        color = voltage_colors.get(voltage, '#000000')
-        
-        if voltage in voltage_groups:
-            folium.PolyLine(
-                locations=[(lat, lon) for lat, lon in coords],
-                color=color,
-                weight=3,
-                opacity=0.8,
-                tooltip=f"{voltage} Transmission Line (Cluster {feat['properties']['cluster']})"
-            ).add_to(voltage_groups[voltage])
-    
-    # Add layer control
-    folium.LayerControl(
-        collapsed=True,
-        position='topright',
-        autoZIndex=True
-    ).add_to(m)
-    
-    # Create legends
-    voltage_legend_content = ''.join(
-        f'<div><span style="display:inline-block; width:24px; height:4px; background:{voltage_colors.get(v, "#000000")}; margin-right:4px;"></span> {v}</div>'
-        for v in sorted(voltages_present)
-    )
-    
-    layer_control_content = '''
-        <div style="margin-bottom:8px;"><strong>Layer Controls</strong></div>
-        <div style="font-size:10px; color:#666;">
-            Toggle layers to show/hide different voltage levels
-        </div>
-    '''
-    
-    # Add legends
-    left_legend = create_collapsible_legend(
-        position='left',
-        title='Transmission Lines',
-        content=voltage_legend_content,
-        width=200
-    )
-    
-    right_legend = create_collapsible_legend(
-        position='right',
-        title='Layer Controls',
-        content=layer_control_content,
-        width=250
-    )
-    
-    m.get_root().html.add_child(folium.Element(add_legend_control_script()))
-    m.get_root().html.add_child(folium.Element(left_legend))
-    m.get_root().html.add_child(folium.Element(right_legend))
-    
-    processing_time = time.time() - start_time
-    logging.info(f"Transmission map creation completed in {processing_time:.2f} seconds")
-    
-    return m
-
 def read_substation_data(force_recompute=False):
     """
     Reads infrastructure_data.xlsx and returns a DataFrame with rows where 'substation_type' is not blank.
@@ -1735,7 +1626,7 @@ def create_integrated_map(force_recompute=False):
         <div><span style="background:#000000; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Flexible</div>
     '''
     
-    # Create legends using the standardized function
+    # Create legends using the standardized function with different positions
     powerline_legend = create_collapsible_legend(
         position='left',
         title='Transmission Line Legend',
@@ -1744,7 +1635,7 @@ def create_integrated_map(force_recompute=False):
     )
     
     substation_legend = create_collapsible_legend(
-        position='left',
+        position='right',
         title='Substation Voltage Legend',
         content=substation_legend_content,
         width=200
