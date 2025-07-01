@@ -680,6 +680,18 @@ def create_gem_map(force_recompute=False):
     start_time = time.time()
     logging.info("Starting GEM map creation")
     
+    # Define color scheme for technology types only
+    tech_colors = {
+        'Solar': '#FF0000',            # red
+        'Hydro': '#003366',            # dark blue
+        'LNG-Fired Gas': '#808080',    # middle grey
+        'Domestic Gas-Fired': '#333333', # dark grey
+        'Coal': '#000000',       # black
+        'Coal Terminal': '#8B4513',    # sienna
+        'Wind': '#87CEEB',       # light blue (same as Onshore)
+        'LNG Terminal': '#D3D3D3',     # light grey (same as LNG-Fired Gas)
+    }
+    
     # Read all datasets
     logging.info("Reading GEM datasets...")
     datasets = [
@@ -700,8 +712,20 @@ def create_gem_map(force_recompute=False):
     
     logging.info(f"Found {len(valid_dfs)} non-empty GEM datasets")
     combined_df = pd.concat(valid_dfs, ignore_index=True)
-    logging.info(f"Combined dataset size: {len(combined_df)} rows")
+    type_mapping = {
+        'Coal Plant': 'Coal',
+        'Wind Power': 'Wind',
+        'Oil/Gas Plant - fossil gas: natural gas': 'Domestic Gas-Fired',
+        'Oil/Gas Plant - fossil gas: LNG': 'LNG-Fired Gas',
+        'Oil/Gas Plant - fossil gas: natural gas, fossil liquids: fuel oil': 'Natural Gas/Fuel Oil',
+        'LNG Terminal': 'LNG Terminal',
+        'Hydropower Plant': 'Hydro',
+        'Solar Farm': 'Solar'
+    }
     
+    combined_df['type'] = combined_df['type'].map(type_mapping).fillna(combined_df['type'])
+    logging.info(f"Combined dataset size: {len(combined_df)} rows")
+
     # Create base map
     logging.info("Creating base map")
     m = folium.Map(
@@ -716,60 +740,70 @@ def create_gem_map(force_recompute=False):
     for Plugin in (Fullscreen, MiniMap, MeasureControl):
         Plugin().add_to(m)
     
-    # Process feature groups and markers
-    logging.info("Processing feature groups and markers")
+    # Process markers by technology type only
+    logging.info("Processing markers by technology type")
     feature_groups = {}
     marker_count = 0
-    
+
     for asset_type in combined_df['type'].unique():
         type_df = combined_df[combined_df['type'] == asset_type]
         logging.info(f"Processing {len(type_df)} assets of type: {asset_type}")
         
-        # Add markers for each asset
+        # Create feature group for this technology type if it doesn't exist
+        if asset_type not in feature_groups:
+            feature_groups[asset_type] = folium.FeatureGroup(name=asset_type, show=True).add_to(m)
+        
+        fg = feature_groups[asset_type]
+        
+        # Add markers for each asset of this type
         for _, row in type_df.iterrows():
             marker_count += 1
             if marker_count % 100 == 0:
                 logging.info(f"Added {marker_count} markers to map")
             
-            # Determine the appropriate feature group
-            if row['type'].startswith('Oil/Gas Plant'):
-                group_name = f"{row['type']} ({row['fuel']}) - {row['status']}"
-            else:
-                group_name = f"{row['type']} - {row['status']}"
+            # Get base color for asset type - map GEM types to integrated map colors
+            base_type = row['type'].split(' - ')[0] if ' - ' in row['type'] else row['type']
+            base_color = tech_colors.get(base_type, '#888888')  # Default gray for unknown types
             
-            # Get feature group
-            fg = feature_groups.get(group_name)
-            if not fg:
-                continue
-            
-            # Get base color for asset type
-            base_color = type_colors.get(row['type'].split(' - ')[0], '#888888')
-            # Get status color
-            status_color = status_colors.get(row['status'], '#000000')
-            
-            # Scale marker size based on capacity if available
-            radius = 8
-            if 'capacity' in row and pd.notnull(row['capacity']):
-                radius = max(6, min(20, (float(row['capacity']) ** 0.5) * 0.5))
-            
-            # Create marker with status-colored border and type-colored fill
+            # Create marker with technology color only, status shown in tooltip
             folium.CircleMarker(
-                location=[row['latitude'], row['longitude']],
-                radius=radius,
-                color=status_color,  # Border color based on status
-                weight=2,
-                opacity=0.8,
-                fill=True,
-                fill_color=base_color,  # Fill color based on type
-                fill_opacity=0.6,
-                tooltip=f"{row['name']} ({row['type']})<br>Status: {row['status']}<br>Capacity: {row.get('capacity', 'N/A')} MW"
-            ).add_to(fg)
+                    location=[row['latitude'], row['longitude']],
+                    radius=max(4, (float(row['capacity']) ** 0.5) * 0.5),
+                    color='#222',  # No border
+                    opacity=0.3,
+                    fill=True,
+                    fill_color=base_color,  # Fill color based on technology type only
+                    fill_opacity=0.7,
+                    weight=1,
+                    tooltip=f"{row['name']} ({row['type']})<br>Status: {row['status']}<br>Capacity: {row.get('capacity', 'N/A')} MW"
+                ).add_to(fg)
     
     logging.info(f"Total markers added: {marker_count}")
     
-    # Add legends
-    logging.info("Adding legends and controls")
+    # Add layer control
+    folium.LayerControl(
+        collapsed=True,
+        position='topright',
+        autoZIndex=True
+    ).add_to(m)
+    
+    # Create legend content for technology types only
+    tech_legend_content = ''.join(
+        f'<div><span style="background:{color}; width:12px; height:12px; display:inline-block; border-radius:50%; margin-right:4px;"></span> {tech}</div>'
+        for tech, color in tech_colors.items()
+    )
+    
+    # Create technology legend
+    tech_legend = create_collapsible_legend(
+        position='left',
+        title='Technology Types',
+        content=tech_legend_content,
+        width=250
+    )
+    
+    # Add legend and control script
     m.get_root().html.add_child(folium.Element(add_legend_control_script()))
+    m.get_root().html.add_child(folium.Element(tech_legend))
     
     processing_time = time.time() - start_time
     logging.info(f"GEM map creation completed in {processing_time:.2f} seconds")
@@ -1507,13 +1541,13 @@ def create_integrated_map(force_recompute=False):
         'Solar': '#FF0000',            # red
         'Hydro': '#003366',            # dark blue
         'Onshore': '#87CEEB',          # light blue
-        'LNG-Fired Gas': '#D3D3D3',    # light grey
+        'LNG-Fired Gas': '##808080',    # light grey
         'Domestic Gas-Fired': '#333333', # dark grey
         'Pumped-Storage': '#4682B4',   # medium blue
         'Nuclear': '#800080',          # purple
         'Biomass': '#228B22',          # green
         'Waste-To-Energy': '#8B6F22',  # dirty green/brown
-        'Flexible': '#000000',         # black
+        'Flexible': '#1A1A1A',         # very dark grey
     }
     
     for tech in df.tech.unique():
