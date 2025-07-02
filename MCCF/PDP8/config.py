@@ -30,11 +30,6 @@ NEW_TRANSFORMER_MAP = RESULTS_DIR / "vn_new_transformers_map.html"
 GEM_MAP = RESULTS_DIR / "vn_gem_assets_map.html"
 OPENINFRA_EXISTING_GENERATOR_MAP = RESULTS_DIR / "vn_openinfra_existing_generators_map.html"
 
-# Kepler output files
-KEPLER_POWER_MAP = RESULTS_DIR / "kepler_power_map.html"
-KEPLER_SUBSTATION_MAP = RESULTS_DIR / "kepler_substation_map.html"
-KEPLER_TRANSMISSION_MAP = RESULTS_DIR / "kepler_transmission_map.html"
-
 # Create directories if they don't exist
 DATA_DIR.mkdir(exist_ok=True)
 RESULTS_DIR.mkdir(exist_ok=True) 

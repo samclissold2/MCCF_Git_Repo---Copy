@@ -283,6 +283,7 @@ def create_integrated_map(force_recompute=False):
             opacity=0.7,
             tooltip=f"{voltage} Line (Cluster {feat['properties']['cluster']})"
         ).add_to(transmission_fg)
+        breakpoint()
     
     # Add substations
     sdf = utils.read_substation_data()
@@ -389,7 +390,7 @@ def create_integrated_map(force_recompute=False):
                     fill_color=color,
                     fill_opacity=0.7,
                     weight=1,
-                    tooltip=f"{row[name_col]} ({row.tech}, {row['period']}) — {row.mw:.0f} MW"
+                    tooltip=f"{row[name_col]} ({row.tech}, {row['period']}) — {row.mw:.0f}MW"
                 ).add_to(fg)
     
     # Add planned transformers
@@ -751,7 +752,7 @@ def create_comprehensive_map(force_recompute: bool = False):
             color=color,
             weight=4,
             opacity=0.7,
-            tooltip=f"{voltage} Line (Cluster {feat['properties']['cluster']})"
+            tooltip=f"{voltage} Operating Transmission Line"
         ).add_to(transmission_fg)
     
     # Add substations
@@ -862,12 +863,12 @@ def create_comprehensive_map(force_recompute: bool = False):
                 radius=rad,
                 color='#222',  # faint outline
                 # The 'opacity' parameter controls the transparency of the marker's border.
-                opacity=0.7,
+                opacity=0.3,
                 fill=True,
                 fill_color=colour,
                 # The 'fill_opacity' parameter controls the transparency of the marker's fill color.
-                fill_opacity=0.6,
-                tooltip=f"{row.iloc[0]} - {row.capacity} - {row.status}"
+                fill_opacity=0.4,
+                tooltip=f"{row.iloc[0]} - {row.capacity}MW - {row.status}"
             ).add_to(fg)
 
     # ---------- PLANNED  --------------------------------------------------
@@ -902,7 +903,7 @@ def create_comprehensive_map(force_recompute: bool = False):
                     [r.lat, r.lon],
                     radius=rad,
                     color="#222",
-                    opacity=0.7,
+                    opacity=0.3,
                     fill=True,
                     fill_color=colour,
                     fill_opacity=1.0,
