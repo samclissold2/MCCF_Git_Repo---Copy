@@ -804,7 +804,7 @@ def create_comprehensive_map(force_recompute: bool = False):
             folium.Marker(
                 location=[row.latitude, row.longitude],
                 icon=folium.DivIcon(html=f'<div style="font-size:10px; color:{color}; font-weight:bold;">×</div>'),
-                tooltip=f"Substation ({row['voltage_cat']})"
+                tooltip=f"Operating Transformer - ({row['voltage_cat']})"
             ).add_to(sub_fg)
 
 
@@ -845,7 +845,6 @@ def create_comprehensive_map(force_recompute: bool = False):
         "Coal Terminal": "#8B4513",
     }
     # Scale GEM marker sizes by capacity (larger capacity → larger radius)
-    gem_max_cap = gem_df["capacity"].max(skipna=True)
     min_r, max_r = 4, 12  # radius bounds
 
     for tech in gem_df["type"].unique():
@@ -862,11 +861,13 @@ def create_comprehensive_map(force_recompute: bool = False):
                 location=[row.latitude, row.longitude],
                 radius=rad,
                 color='#222',  # faint outline
-                opacity=0.3,
+                # The 'opacity' parameter controls the transparency of the marker's border.
+                opacity=0.7,
                 fill=True,
                 fill_color=colour,
-                fill_opacity=0.4,
-                tooltip=f"{row.name} - {row.capacity} - {row.status}"
+                # The 'fill_opacity' parameter controls the transparency of the marker's fill color.
+                fill_opacity=0.6,
+                tooltip=f"{row.iloc[0]} - {row.capacity} - {row.status}"
             ).add_to(fg)
 
     # ---------- PLANNED  --------------------------------------------------
@@ -901,11 +902,11 @@ def create_comprehensive_map(force_recompute: bool = False):
                     [r.lat, r.lon],
                     radius=rad,
                     color="#222",
-                    opacity=0.3,
+                    opacity=0.7,
                     fill=True,
                     fill_color=colour,
                     fill_opacity=1.0,
-                    tooltip=f"{r[name_col]} ({period}) — {r.mw:.0f} MW",
+                    tooltip=f"{r[name_col]} - Expected Completion in ({period}) — {r.mw:.0f}MW",
                 ).add_to(fg)
 
     # Planned substations
@@ -955,13 +956,8 @@ def create_comprehensive_map(force_recompute: bool = False):
             folium.Marker(
                 location=[row['lat'], row['lon']],
                 icon=folium.DivIcon(html=f'<div style="font-size:10px; color:{color}; font-weight:bold;">×</div>'),
-                tooltip=f"Planned Transformer ({row['voltage_cat']}) - {row['name']} - {row['sheet_source']}"
+                tooltip=f"Planned Transformer ({row['voltage_cat']}) - {row['name']}"
             ).add_to(transformer_fg)
-    
-    # Add layer control
-    folium.LayerControl(collapsed=True,
-        position='topright',
-        autoZIndex=True).add_to(m)
     
     # Add legends using the standardized collapsible legend system
     powerline_legend_content = '''
@@ -1001,15 +997,21 @@ def create_comprehensive_map(force_recompute: bool = False):
         <div><span style="background:#000000; width:12px; height:12px; display:inline-block; border-radius:50%;"></span> Flexible</div>
     '''
     
+    existing_legend_content = ''.join(
+        f'<div><span style="background: {colour}; opacity: 0.3; width: 12px; height: 12px; display: inline-block; border-radius: 50%; margin-right: 4px;"></span> {tech}</div>'
+        for tech, colour in tech_colour.items()
+    )
+
     # Create custom legends stacked vertically on the left side with good spacing
     powerline_legend_id = 'legend-powerline'
     substation_legend_id = 'legend-substation'
     project_legend_id = 'legend-project'
-    
+    existing_legend_id = 'legend-existing'
+
     powerline_legend = f'''
     <div id="{powerline_legend_id}" style="
         position: fixed; 
-        bottom: 50px; 
+        bottom: 20px; 
         left: 50px; 
         width: 200px; 
         z-index:9999; 
@@ -1031,8 +1033,8 @@ def create_comprehensive_map(force_recompute: bool = False):
     substation_legend = f'''
     <div id="{substation_legend_id}" style="
         position: fixed; 
-        bottom: 300px; 
-        left: 50px; 
+        bottom: 20px; 
+        left: 250px; 
         width: 200px; 
         z-index:9999; 
         background: white; 
@@ -1053,8 +1055,8 @@ def create_comprehensive_map(force_recompute: bool = False):
     project_legend = f'''
     <div id="{project_legend_id}" style="
         position: fixed; 
-        bottom: 650px; 
-        left: 50px; 
+        bottom: 20px; 
+        left: 450px; 
         width: 200px; 
         z-index:9999; 
         background: white; 
@@ -1064,7 +1066,7 @@ def create_comprehensive_map(force_recompute: bool = False):
         font-size:12px; 
         padding: 10px;">
         <div onclick="toggleLegend('{project_legend_id}')" style="cursor:pointer;font-weight:bold;user-select:none;margin-bottom:5px;padding:5px;background:#f8f8f8;border-radius:4px;">
-            Power Project Legend <span id="{project_legend_id}-arrow" style="float:right;">▶</span>
+            PDP8 Planned Projects Legend <span id="{project_legend_id}-arrow" style="float:right;">▶</span>
         </div>
         <div id="{project_legend_id}-content" style="display:none; margin-top:8px;">
             {project_legend_content}
@@ -1072,11 +1074,45 @@ def create_comprehensive_map(force_recompute: bool = False):
     </div>
     '''
     
+
+    existing_legend = f"""
+    <div id="{existing_legend_id}" style="
+        position: fixed;
+        bottom: 20px;
+        left: 650px;
+        width: 200px;
+        z-index: 9999;
+        background: white;
+        border: 2px solid grey;
+        border-radius: 6px;
+        box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+        font-size: 12px;
+        padding: 10px;
+    ">
+        <div onclick="toggleLegend('{existing_legend_id}')" style="
+            cursor: pointer;
+            font-weight: bold;
+            user-select: none;
+            margin-bottom: 5px;
+            padding: 5px;
+            background: #f8f8f8;
+            border-radius: 4px;
+        ">
+            Existing Assets Legend <span id="{existing_legend_id}-arrow" style="float: right;">▶</span>
+        </div>
+        <div id="{existing_legend_id}-content" style="display: none; margin-top: 8px;">
+            {existing_legend_content}
+        </div>
+    </div>
+    """
+
+
     # Add the legend control script and legends to map
     m.get_root().html.add_child(folium.Element(utils.add_legend_control_script()))
     m.get_root().html.add_child(folium.Element(powerline_legend))
     m.get_root().html.add_child(folium.Element(substation_legend))
     m.get_root().html.add_child(folium.Element(project_legend))
+    m.get_root().html.add_child(folium.Element(existing_legend))
     folium.LayerControl(collapsed=True, position="topright").add_to(m)
 
     for P in (Fullscreen, MeasureControl):

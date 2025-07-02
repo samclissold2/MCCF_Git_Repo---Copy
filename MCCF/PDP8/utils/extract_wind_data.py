@@ -2,6 +2,7 @@ import geopandas as gpd
 import pandas as pd
 from pathlib import Path
 from config import WIND_GEOJSON, DATA_DIR
+import numpy as np
 
 # Output directory for extracted data
 extracted_data_dir = DATA_DIR / "extracted_data"
