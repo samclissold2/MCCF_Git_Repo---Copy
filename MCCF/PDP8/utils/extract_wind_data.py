@@ -2,6 +2,7 @@ import geopandas as gpd
 import pandas as pd
 from pathlib import Path
 from config import WIND_GEOJSON, DATA_DIR
+import numpy as np
 
 # Output directory for extracted data
 extracted_data_dir = DATA_DIR / "extracted_data"
@@ -14,24 +15,19 @@ if not WIND_GEOJSON.exists():
     exit(1)
 
 gdf = gpd.read_file(WIND_GEOJSON)
+gdf = gdf.explode(index_parts=False)
 
-# Extract coordinates and wind power density values
-records = []
-for _, row in gdf.iterrows():
-    # Assume wind power density is in the properties as 'wind_power_density'
-    wind_val = row.get('wind_power_density', None)
-    geom = row.geometry
-    if geom.type == 'MultiPolygon':
-        for polygon in geom.geoms:
-            for x, y in polygon.exterior.coords:
-                records.append({'lat': y, 'lon': x, 'wind_power_density': wind_val})
-    elif geom.type == 'Polygon':
-        for x, y in geom.exterior.coords:
-            records.append({'lat': y, 'lon': x, 'wind_power_density': wind_val})
-    # Add more geometry types if needed
+# Vectorized extraction of coordinates
+coords_series = gdf.geometry.apply(lambda geom: np.array(geom.exterior.coords))
+lengths = coords_series.apply(len)
+all_coords = np.vstack(coords_series.to_list())
+wind_vals = np.repeat(gdf.get('wind_power_density', None).values, lengths)
 
-# Create DataFrame
-wind_df = pd.DataFrame(records)
+wind_df = pd.DataFrame({
+    'lat': all_coords[:, 1],
+    'lon': all_coords[:, 0],
+    'wind_power_density': wind_vals
+})
 print(wind_df.head())
 print(f"Extracted {len(wind_df)} wind power density points.")
 
