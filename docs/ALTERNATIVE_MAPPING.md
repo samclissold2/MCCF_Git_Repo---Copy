@@ -22,13 +22,14 @@ The table below compares four options that can match the required visuals: varia
 
 ## Recommended Approach
 
-`pydeck` with deck.gl offers the best balance of performance and portability. WebGL keeps interaction smooth even with many features, and `to_html()` outputs a single file for offline use. Optional Flask hosting can be added without affecting existing Folium scripts.
+`pydeck` with deck.gl offers the best balance of performance and portability. WebGL keeps interaction smooth even with many features, and `to_html()` outputs a single file for offline use. Optional Flask hosting can be added without affecting existing Folium scripts. The example below also shows how to visualise solar irradiance points and wind power density as heat maps alongside projects and substations.
 
 ### Code Sketch
 
 ```python
 import os
 import json
+import pandas as pd
 import pydeck as pdk
 from flask import Flask, render_template_string, request, abort
 from MCCF.PDP8 import map_utils as utils
@@ -41,6 +42,8 @@ def _hex_to_rgb(hex_color: str) -> list[int]:
 power_lines = utils.get_power_lines()
 substations = utils.read_substation_data()
 projects, name_col = utils.read_and_clean_power_data()
+solar_df = utils.read_solar_irradiance_points()
+wind_heat = utils.create_wind_power_density_layer()
 
 # ---- Layer definitions ----
 projects["radius"] = (projects["mw"].abs() ** 0.5) * 1500
@@ -60,6 +63,21 @@ sub_layer = pdk.Layer(
     get_fill_color="[0,0,255]",
     pickable=True,
 )
+solar_layer = pdk.Layer(
+    "HeatmapLayer",
+    data=solar_df,
+    get_position="[lon, lat]",
+    get_weight="irradiance",
+    radiusPixels=40,
+)
+wind_df = pd.DataFrame(wind_heat.data, columns=["lat", "lon", "value"])
+wind_layer = pdk.Layer(
+    "HeatmapLayer",
+    data=wind_df,
+    get_position="[lon, lat]",
+    get_weight="value",
+    radiusPixels=40,
+)
 line_layer = pdk.Layer(
     "GeoJsonLayer",
     data=json.loads(power_lines.to_json()),
@@ -68,7 +86,7 @@ line_layer = pdk.Layer(
 )
 
 deck = pdk.Deck(
-    layers=[line_layer, sub_layer, project_layer],
+    layers=[line_layer, sub_layer, project_layer, solar_layer, wind_layer],
     initial_view_state=pdk.ViewState(
         latitude=projects.lat.mean(),
         longitude=projects.lon.mean(),

@@ -1,6 +1,7 @@
 """Example pydeck map generation using MCCF's processed data."""
 import os
 import json
+import pandas as pd
 import pydeck as pdk
 from flask import Flask, render_template_string, request, abort
 
@@ -19,6 +20,8 @@ def build_deck(force_recompute: bool = False) -> pdk.Deck:
     power_lines = utils.get_power_lines()
     substations = utils.read_substation_data(force_recompute=force_recompute)
     projects, name_col = utils.read_and_clean_power_data(force_recompute=force_recompute)
+    solar_df = utils.read_solar_irradiance_points(force_recompute=force_recompute)
+    wind_heat = utils.create_wind_power_density_layer(force_recompute=force_recompute)
 
     # ---- Prepare project markers ----
     tech_colors = {
@@ -46,6 +49,18 @@ def build_deck(force_recompute: bool = False) -> pdk.Deck:
         name="Power Projects",
     )
 
+    # ---- Solar irradiance heat map ----
+    solar_layer = None
+    if solar_df is not None and not solar_df.empty:
+        solar_layer = pdk.Layer(
+            "HeatmapLayer",
+            data=solar_df,
+            get_position="[lon, lat]",
+            get_weight="irradiance",
+            radiusPixels=40,
+            name="Solar Irradiance",
+        )
+
     # ---- Prepare substation markers ----
     substations["radius"] = 1000
     substations["color"] = [0, 0, 255]
@@ -59,6 +74,19 @@ def build_deck(force_recompute: bool = False) -> pdk.Deck:
         pickable=True,
         name="Substations",
     )
+
+    # ---- Wind power density heat map ----
+    wind_layer = None
+    if wind_heat is not None:
+        wind_df = pd.DataFrame(wind_heat.data, columns=["lat", "lon", "value"])
+        wind_layer = pdk.Layer(
+            "HeatmapLayer",
+            data=wind_df,
+            get_position="[lon, lat]",
+            get_weight="value",
+            radiusPixels=40,
+            name="Wind Power Density",
+        )
 
     # ---- Transmission line layer ----
     line_layer = pdk.Layer(
@@ -76,8 +104,14 @@ def build_deck(force_recompute: bool = False) -> pdk.Deck:
         zoom=6,
     )
 
+    layers = [line_layer, sub_layer, project_layer]
+    if solar_layer is not None:
+        layers.append(solar_layer)
+    if wind_layer is not None:
+        layers.append(wind_layer)
+
     deck = pdk.Deck(
-        layers=[line_layer, sub_layer, project_layer],
+        layers=layers,
         initial_view_state=view_state,
         map_style="mapbox://styles/mapbox/light-v10",
         tooltip={"text": "{name}"},
