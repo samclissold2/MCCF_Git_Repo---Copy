@@ -126,11 +126,14 @@ def create_gem_map(force_recompute=False):
     
     # Process markers by technology type only
     logging.info("Processing markers by technology type")
+    combined_df["base_type"] = combined_df["type"].str.split(" - ").str[0]
+    combined_df["color"] = combined_df["base_type"].map(tech_colors).fillna("#888888")
+    combined_df["radius"] = np.maximum(4, np.sqrt(combined_df["capacity"].fillna(0).astype(float)) * 0.5)
+
     feature_groups = {}
     marker_count = 0
 
-    for asset_type in combined_df['type'].unique():
-        type_df = combined_df[combined_df['type'] == asset_type]
+    for asset_type, type_df in combined_df.groupby('type'):
         logging.info(f"Processing {len(type_df)} assets of type: {asset_type}")
         
         # Create feature group for this technology type if it doesn't exist
@@ -140,26 +143,24 @@ def create_gem_map(force_recompute=False):
         fg = feature_groups[asset_type]
         
         # Add markers for each asset of this type
-        for _, row in type_df.iterrows():
+        for row in type_df.itertuples(index=False):
             marker_count += 1
             if marker_count % 100 == 0:
                 logging.info(f"Added {marker_count} markers to map")
             
             # Get base color for asset type - map GEM types to integrated map colors
-            base_type = row['type'].split(' - ')[0] if ' - ' in row['type'] else row['type']
-            base_color = tech_colors.get(base_type, '#888888')  # Default gray for unknown types
             
             # Create marker with technology color only, status shown in tooltip
             folium.CircleMarker(
-                    location=[row['latitude'], row['longitude']],
-                    radius=max(4, (float(row['capacity']) ** 0.5) * 0.5),
+                    location=[row.latitude, row.longitude],
+                    radius=row.radius,
                     color='#222',  # No border
                     opacity=0.3,
                     fill=True,
-                    fill_color=base_color,  # Fill color based on technology type only
+                    fill_color=row.color,  # Fill color based on technology type only
                     fill_opacity=0.7,
                     weight=1,
-                    tooltip=f"{row['name']} ({row['type']})<br>Status: {row['status']}<br>Capacity: {row.get('capacity', 'N/A')} MW"
+                    tooltip=f"{row.name} ({row.type})<br>Status: {row.status}<br>Capacity: {row.capacity if pd.notna(row.capacity) else 'N/A'} MW"
                 ).add_to(fg)
     
     logging.info(f"Total markers added: {marker_count}")
@@ -331,7 +332,7 @@ def create_integrated_map(force_recompute=False):
         for _, row in sdf.iterrows():
             color = voltage_colors.get(row['voltage_cat'], 'black')
             folium.Marker(
-                location=[row['latitude'], row['longitude']],
+                location=[row.latitude, row.longitude],
                 icon=folium.DivIcon(html=f'<div style="font-size:10px; color:{color}; font-weight:bold;">×</div>'),
                 tooltip=f"Substation ({row['voltage_cat']})"
             ).add_to(sub_fg)
@@ -801,7 +802,7 @@ def create_comprehensive_map(force_recompute: bool = False):
         for _, row in sdf.iterrows():
             color = voltage_colors.get(row['voltage_cat'], 'black')
             folium.Marker(
-                location=[row['latitude'], row['longitude']],
+                location=[row.latitude, row.longitude],
                 icon=folium.DivIcon(html=f'<div style="font-size:10px; color:{color}; font-weight:bold;">×</div>'),
                 tooltip=f"Substation ({row['voltage_cat']})"
             ).add_to(sub_fg)

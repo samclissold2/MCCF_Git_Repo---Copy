@@ -1184,26 +1184,23 @@ def cache_polylines(gdf, cache_file='powerline_polylines.geojson', eps=0.0025, m
         gdf['voltage_cat'] = gdf['max_voltage'].apply(voltage_category)
     else:
         gdf['voltage_cat'] = 'Unknown'
-    breakpoint()
+
     voltage_groups = gdf.groupby('voltage_cat')
     
     for voltage_cat, group in voltage_groups:
         if len(group) < min_samples:
             continue
             
-        # Get coordinates of power line endpoints
-        coords = []
-        for geom in group.geometry:
-            if geom.geom_type == 'LineString':
-                coords.extend(geom.coords)  # coords are already (x,y) tuples
-            elif geom.geom_type == 'MultiLineString':
-                for line in geom.geoms:
-                    coords.extend(line.coords)  # coords are already (x,y) tuples
-        
-        if not coords:
+        coords_arrays = group.geometry.apply(
+            lambda geom: np.vstack([
+                np.array(line.coords) for line in (
+                    geom.geoms if geom.geom_type == 'MultiLineString' else [geom]
+                )
+            ])
+        ).to_list()
+        if not coords_arrays:
             continue
-            
-        coords = np.array(coords)
+        coords = np.vstack(coords_arrays)
         db = DBSCAN(eps=eps, min_samples=min_samples).fit(coords)
         
         # Process each cluster within this voltage category
