@@ -33,7 +33,7 @@ et-xmlfile==1.1.0
 # ─── Plotting & viz ────────────────────────────────────────────────────────────
 plotly==5.13.1
 tenacity==8.0.1      # plotly dependency
-pydeck==0.8.1
+pydeck>=0.8.1b1
 
 # ─── Utility libs ──────────────────────────────────────────────────────────────
 requests==2.31.0
@@ -55,7 +55,7 @@ logging-tree==1.9
 line_profiler==4.1.2
 cython==0.29.36
 py-cpuinfo==9.0.0
-typing_extensions==4.10.0
+typing_extensions==4.3.0
 platformdirs==3.2.0
 packaging==23.0
 commonmark==0.9.1
