@@ -273,7 +273,6 @@ def create_integrated_map(force_recompute=False):
             opacity=0.7,
             tooltip=f"{voltage} Line (Cluster {feat['properties']['cluster']})"
         ).add_to(transmission_fg)
-        breakpoint()
     
     # Add substations
     sdf = utils.read_substation_data()
