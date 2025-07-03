@@ -16,21 +16,11 @@ import time
 import pickle
 from datetime import datetime
 from config import (
-    INFRASTRUCTURE_DATA,
-    PDP8_PROJECT_DATA,
-    PDP8_POWER_LINES,
-    VNM_GPKG,
     PROJECTS_MAP,
-    SUBSTATION_MAP,
-    TRANSMISSION_MAP,
     INTEGRATED_MAP,
     WIND_MAP,
-    NEW_TRANSFORMER_MAP,
-    DATA_DIR,
     RESULTS_DIR,
     GEM_MAP,
-    OPENINFRA_EXISTING_GENERATOR_MAP,
-    OPENINFRA_EXISTING_GENERATOR_DATA
 )
 
 # Attempt relative import first (works when executed with "python -m MCCF.PDP8.create_map")
@@ -1121,6 +1111,73 @@ def create_comprehensive_map(force_recompute: bool = False):
 
     return m
 
+def create_new_transmission_data_map():
+    """
+    Create a Folium map visualizing new transmission data from read_new_transmission_data.
+    """
+    try:
+        # Get the transmission data
+        pdp8_transmission_data = utils.read_new_transmission_data(force_recompute=True)
+        if pdp8_transmission_data is None or pdp8_transmission_data.empty:
+            print("No transmission data available.")
+            return None
+
+        # Create a base map centered on Vietnam
+        m = folium.Map(
+            location=[16.0, 106.0],  # Center of Vietnam
+            zoom_start=6,
+            tiles="CartoDB Positron"
+        )
+
+        # Voltage color mapping (add more as needed)
+        voltage_colors = {
+            500: 'red',
+            220: 'orange',
+
+        }
+
+        # Add a FeatureGroup for new transmission points
+        fg = folium.FeatureGroup(name="New Transmission Points", show=True).add_to(m)
+
+        # Plot each transmission point as a custom DivIcon marker
+        for _, row in pdp8_transmission_data.iterrows():
+            kv = int(row['kV'])
+            color = voltage_colors.get(kv, 'black')
+            folium.Marker(
+                location=[row['Latitude'], row['Longitude']],
+                icon=folium.DivIcon(
+                    html=f'<div style="font-size:14px; color:{color}; font-weight:bold;">×</div>'
+                ),
+                tooltip=f"{row['Name']}<br>{row['kV']} kV"
+            ).add_to(fg)
+
+        # Add a legend for voltage levels
+        legend_html = '''
+        <div id="legend-transmission" style="
+            position: fixed; 
+            bottom: 20px; 
+            left: 50px; 
+            width: 200px; 
+            z-index:9999; 
+            background: white; 
+            border:2px solid grey; 
+            border-radius:6px; 
+            box-shadow: 2px 2px 6px rgba(0,0,0,0.3); 
+            font-size:12px; 
+            padding: 10px;">
+            <div style="font-weight:bold; margin-bottom:5px;">Transmission Voltage Legend</div>
+            <div><span style="background:red; width:12px; height:12px; display:inline-block; border-radius:50%; margin-right:4px;"></span> 500kV</div>
+            <div><span style="background:orange; width:12px; height:12px; display:inline-block; border-radius:50%; margin-right:4px;"></span> 220kV</div>
+        </div>
+        '''
+        m.get_root().html.add_child(folium.Element(legend_html))
+
+        folium.LayerControl(collapsed=True, position="topright").add_to(m)
+        return m
+
+    except Exception as e:
+        print(f"An error occurred during the map creation: {e}")
+        return None
 
 def main():
     """
@@ -1136,23 +1193,26 @@ def main():
             'comprehensive',      # ← NEW
             'wind',
             'gem',
-            'all'
-        ], default='integrated',
+            'all',
+            'new_transmission'    # ← ADD THIS LINE
+        ], default='comprehensive',
             help="Type of map to generate")
         parser.add_argument('--force-recompute', action='store_true',
             help="Force recomputation of data (ignore cache)")
         parser.add_argument('--clear-cache', action='store_true',
             help="Clear all cached data")
-        
+
+
         args = parser.parse_args()
         logging.info(f"Generating map type: {args.map}")
         
-                # Clear cache if requested
+        # Clear cache if requested
         if args.clear_cache:
             utils.clear_cache()
             logging.info("Cache cleared")
+        
         try:
-
+        
             if args.map in ['integrated', 'all']:
                 logging.info("Generating integrated map")
                 m = create_integrated_map(force_recompute=args.force_recompute)
@@ -1176,6 +1236,12 @@ def main():
                 m = create_comprehensive_map(force_recompute=args.force_recompute)
                 if m:
                     save_and_open_map(m, RESULTS_DIR / 'vn_comprehensive_map.html')
+
+            if args.map == 'new_transmission':  # ← ADD THIS BLOCK
+                logging.info("Generating new transmission map")
+                m = create_new_transmission_data_map()
+                if m:
+                    save_and_open_map(m, RESULTS_DIR / 'vn_new_transmission_map.html')
 
             total_time = time.time() - start_time
             logging.info(f"Map generation completed in {total_time:.2f} seconds")

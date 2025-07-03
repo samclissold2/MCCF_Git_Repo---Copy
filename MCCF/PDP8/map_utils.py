@@ -18,19 +18,10 @@ from datetime import datetime
 from config import (
     INFRASTRUCTURE_DATA,
     PDP8_PROJECT_DATA,
-    PDP8_POWER_LINES,
     VNM_GPKG,
-    PROJECTS_MAP,
-    SUBSTATION_MAP,
-    TRANSMISSION_MAP,
-    INTEGRATED_MAP,
-    WIND_MAP,
-    NEW_TRANSFORMER_MAP,
     DATA_DIR,
     RESULTS_DIR,
-    GEM_MAP,
-    OPENINFRA_EXISTING_GENERATOR_MAP,
-    OPENINFRA_EXISTING_GENERATOR_DATA
+    NEW_TRANSMISSION_DATA
 )
 import rasterio
 
@@ -108,6 +99,57 @@ def setup_logging():
 
 # Initialize logging when module is imported
 setup_logging()
+
+
+def read_new_transmission_data(force_recompute=False):
+
+    # Check cache first
+    if not force_recompute:
+        cached_data = load_from_cache('read_new_transmission_data')
+        if cached_data is not None:
+            return cached_data
+
+    start_time = time.time()
+    logging.info("Starting NEW PDP8 transmission data reading")
+
+    if not NEW_TRANSMISSION_DATA.exists():
+        logging.error(f"Could not find {NEW_TRANSMISSION_DATA}")
+        raise FileNotFoundError(f"Could not find {NEW_TRANSMISSION_DATA}")
+
+    try:
+        logging.info(f"Reading transmission data from {NEW_TRANSMISSION_DATA}")
+        sheet_names = [
+            '500kV North', '220kV North',
+            '500kV Central', '220kV Central',
+            '500kV South', '220kV South'
+        ]
+
+
+        dfs = []
+        for sheet in sheet_names:
+            logging.info(f"Reading sheet: {sheet}")
+            df_sheet = pd.read_excel(NEW_TRANSMISSION_DATA, sheet_name=sheet, usecols=['Name', 'kV', 'Number of circuits × kilometres', 'Operational Phase', 'Latitude', 'Longitude'])
+            dfs.append(df_sheet)
+        
+        pdp_planned_transmission_lines = pd.concat(dfs, ignore_index=True)
+        logging.info(f"Initial data shape: {pdp_planned_transmission_lines.shape}")
+    
+
+
+        processing_time = time.time() - start_time
+        logging.info(f"NEW PDP8 transmission data reading completed in {processing_time:.2f} seconds")      
+        save_to_cache('read_new_transmission_data', pdp_planned_transmission_lines)
+
+        logging.info(f"Final transmission records: {len(pdp_planned_transmission_lines)}")
+
+        pdp_planned_transmission_lines = pdp_planned_transmission_lines.drop_duplicates()
+
+        return pdp_planned_transmission_lines
+
+    except Exception as e:
+        logging.error(f"Error reading PDP8 transmission data: {str(e)}", exc_info=True)
+        raise
+
 
 # GEM Data Processing Functions - Updated for cleaned data
 def read_coal_plant_data(force_recompute=False):
@@ -991,6 +1033,8 @@ def read_transmission_data(force_recompute=False):
         logging.error(f"Error reading transmission data: {str(e)}", exc_info=True)
         raise
 
+
+
 def get_source_color(source):
     """Get a consistent color for a given source type."""
     color_map = {
@@ -1102,6 +1146,7 @@ def get_power_lines():
     """
     Reads the powerline data from the GPKG file and returns a GeoDataFrame.
     """
+    
     if not VNM_GPKG.exists():
         logging.error(f"Could not find {VNM_GPKG}")
         raise FileNotFoundError(f"Could not find {VNM_GPKG}")
