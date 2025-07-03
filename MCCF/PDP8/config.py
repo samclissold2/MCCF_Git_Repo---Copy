@@ -29,6 +29,7 @@ WIND_MAP = RESULTS_DIR / "vn_wind_power_density_map.html"
 NEW_TRANSFORMER_MAP = RESULTS_DIR / "vn_new_transformers_map.html"
 GEM_MAP = RESULTS_DIR / "vn_gem_assets_map.html"
 OPENINFRA_EXISTING_GENERATOR_MAP = RESULTS_DIR / "vn_openinfra_existing_generators_map.html"
+NEW_TRANSMISSION_DATA = DATA_DIR / "PDP8_new_transmission_lines.xlsx"
 
 # Create directories if they don't exist
 DATA_DIR.mkdir(exist_ok=True)

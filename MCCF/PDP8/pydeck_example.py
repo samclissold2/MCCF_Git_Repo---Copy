@@ -1,11 +1,13 @@
 """Example pydeck map generation using MCCF's processed data."""
+import sys
 import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import json
 import pandas as pd
 import pydeck as pdk
 from flask import Flask, render_template_string, request, abort
 
-from MCCF.PDP8 import map_utils as utils
+from PDP8.map_utils import get_power_lines, read_substation_data, read_and_clean_power_data, read_solar_irradiance_points, create_wind_power_density_layer
 
 
 def _hex_to_rgb(hex_color: str) -> list[int]:
@@ -17,11 +19,11 @@ def _hex_to_rgb(hex_color: str) -> list[int]:
 def build_deck(force_recompute: bool = False) -> pdk.Deck:
     """Create a pydeck ``Deck`` from datasets used in ``create_map``."""
     # Load the same datasets that Folium maps use
-    power_lines = utils.get_power_lines()
-    substations = utils.read_substation_data(force_recompute=force_recompute)
-    projects, name_col = utils.read_and_clean_power_data(force_recompute=force_recompute)
-    solar_df = utils.read_solar_irradiance_points(force_recompute=force_recompute)
-    wind_heat = utils.create_wind_power_density_layer(force_recompute=force_recompute)
+    power_lines = get_power_lines()
+    substations = read_substation_data(force_recompute=force_recompute)
+    projects, name_col = read_and_clean_power_data(force_recompute=force_recompute)
+    solar_df = read_solar_irradiance_points(force_recompute=force_recompute)
+    wind_heat = create_wind_power_density_layer(force_recompute=force_recompute)
 
     # ---- Prepare project markers ----
     tech_colors = {
@@ -49,7 +51,7 @@ def build_deck(force_recompute: bool = False) -> pdk.Deck:
         name="Power Projects",
     )
 
-    # ---- Solar irradiance heat map ----
+    #---- Solar irradiance heat map ----
     solar_layer = None
     if solar_df is not None and not solar_df.empty:
         solar_layer = pdk.Layer(
@@ -63,7 +65,7 @@ def build_deck(force_recompute: bool = False) -> pdk.Deck:
 
     # ---- Prepare substation markers ----
     substations["radius"] = 1000
-    substations["color"] = [0, 0, 255]
+    substations["color"] = [[0, 0, 255]] * len(substations)
 
     sub_layer = pdk.Layer(
         "ScatterplotLayer",
@@ -105,10 +107,10 @@ def build_deck(force_recompute: bool = False) -> pdk.Deck:
     )
 
     layers = [line_layer, sub_layer, project_layer]
-    if solar_layer is not None:
-        layers.append(solar_layer)
-    if wind_layer is not None:
-        layers.append(wind_layer)
+    # if solar_layer is not None:
+    #     layers.append(solar_layer)
+    # if wind_layer is not None:
+    #     layers.append(wind_layer)
 
     deck = pdk.Deck(
         layers=layers,
@@ -121,7 +123,8 @@ def build_deck(force_recompute: bool = False) -> pdk.Deck:
 
 def create_offline_html(deck: pdk.Deck, output_html: str) -> str:
     """Write deck to HTML and return the path."""
-    return deck.to_html(output_html, open_browser=False)
+    deck.to_html(output_html, open_browser=True)
+    return output_html
 
 
 def create_flask_app(html_path: str, token: str) -> Flask:
