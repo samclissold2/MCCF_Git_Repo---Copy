@@ -100,6 +100,18 @@ def setup_logging():
 # Initialize logging when module is imported
 setup_logging()
 
+def split_circuit_km(value):
+    """Parse '#circuits×km' strings."""
+    if value is None or str(value).strip() == "":
+        return pd.Series([None, None, None])
+
+    m = re.match(r"(\d+)\s*[xX]\s*(\d+(?:\.\d+)?)", str(value).strip())
+    if not m:
+        return pd.Series([None, None, None])
+
+    circuits = int(m.group(1))
+    km = float(m.group(2))
+    return pd.Series([circuits, km, circuits * km])
 
 def read_new_transmission_data(force_recompute=False):
 
@@ -119,28 +131,61 @@ def read_new_transmission_data(force_recompute=False):
     try:
         logging.info(f"Reading transmission data from {NEW_TRANSMISSION_DATA}")
         sheet_names = [
-            '500kV North', '220kV North',
-            '500kV Central', '220kV Central',
-            '500kV South', '220kV South'
+            ("500kV North", "North"),
+            ("220kV North", "North"),
+            ("500kV Central", "Central"),
+            ("220kV Central", "Central"),
+            ("500kV South", "South"),
+            ("220kV South", "South"),
         ]
 
 
         dfs = []
-        for sheet in sheet_names:
+        for sheet, region in sheet_names:
             logging.info(f"Reading sheet: {sheet}")
-            df_sheet = pd.read_excel(NEW_TRANSMISSION_DATA, sheet_name=sheet, usecols=['Name', 'kV', 'Number of circuits × kilometres', 'Operational Phase', 'Latitude', 'Longitude'])
+            df_sheet = pd.read_excel(
+                NEW_TRANSMISSION_DATA,
+                sheet_name=sheet,
+            )
+
+            df_sheet.columns = df_sheet.columns.str.strip()
+
+            if "Number of circuits × kilometres" in df_sheet.columns:
+                df_sheet[["circuits", "route_km", "circuit_km"]] = (
+                    df_sheet["Number of circuits × kilometres"].apply(split_circuit_km)
+                )
+
+            lat_col = next((c for c in df_sheet.columns if "lat" in c.lower()), None)
+            lon_col = next((c for c in df_sheet.columns if "lon" in c.lower()), None)
+            if lat_col and lon_col:
+                df_sheet = df_sheet.rename(columns={lat_col: "lat", lon_col: "lon"})
+                df_sheet["lat"] = pd.to_numeric(df_sheet["lat"], errors="coerce")
+                df_sheet["lon"] = pd.to_numeric(df_sheet["lon"], errors="coerce")
+
+            df_sheet["region"] = region
+            df_sheet["sheet_source"] = sheet
             dfs.append(df_sheet)
         
         pdp_planned_transmission_lines = pd.concat(dfs, ignore_index=True)
-        logging.info(f"Initial data shape: {pdp_planned_transmission_lines.shape}")
-    
+        pdp_planned_transmission_lines = pdp_planned_transmission_lines.dropna(subset=["lat", "lon"])
+
+        logging.info(
+            f"Initial data shape: {pdp_planned_transmission_lines.shape}"
+        )
 
 
         processing_time = time.time() - start_time
-        logging.info(f"NEW PDP8 transmission data reading completed in {processing_time:.2f} seconds")      
-        save_to_cache('read_new_transmission_data', pdp_planned_transmission_lines)
+        logging.info(
+            f"NEW PDP8 transmission data reading completed in {processing_time:.2f} seconds"
+        )
+        save_to_cache(
+            "read_new_transmission_data",
+            pdp_planned_transmission_lines,
+        )
 
-        logging.info(f"Final transmission records: {len(pdp_planned_transmission_lines)}")
+        logging.info(
+            f"Final transmission records: {len(pdp_planned_transmission_lines)}"
+        )
 
         pdp_planned_transmission_lines = pdp_planned_transmission_lines.drop_duplicates()
 
@@ -150,6 +195,51 @@ def read_new_transmission_data(force_recompute=False):
         logging.error(f"Error reading PDP8 transmission data: {str(e)}", exc_info=True)
         raise
 
+def annotate_planned_lines(planned_df,
+                           subs=None,
+                           lines=None,
+                           substation_buffer: int = 1000,
+                           line_buffer: int = 250):
+    """Attach nearest substations and existing-line proximity flags.
+
+    If *subs* or *lines* are supplied, those pre-loaded datasets are used;
+    otherwise they are loaded internally (cached versions if available)."""
+    if planned_df.empty:
+        return gpd.GeoDataFrame(planned_df)
+
+    # ---- use supplied datasets, or fall back to internal loaders -----------
+    if subs is None:
+        subs = read_substation_data()
+    if lines is None:
+        lines = get_power_lines()
+
+    planned_gdf = gpd.GeoDataFrame(
+        planned_df,
+        geometry=gpd.points_from_xy(planned_df["lon"], planned_df["lat"]),
+        crs="EPSG:4326",
+    ).to_crs("EPSG:3857")
+
+    subs_gdf = gpd.GeoDataFrame(
+        subs,
+        geometry=gpd.points_from_xy(subs["longitude"], subs["latitude"]),
+        crs="EPSG:4326",
+    ).to_crs("EPSG:3857")
+
+    lines_gdf = lines.to_crs("EPSG:3857")
+
+    nearest = gpd.sjoin_nearest(
+        planned_gdf, subs_gdf, how="left", distance_col="dist_m"
+    )
+    planned_gdf["nearest_substation_dist_m"] = nearest["dist_m"]
+    planned_gdf["near_existing_sub"] = (
+        planned_gdf["nearest_substation_dist_m"] <= substation_buffer
+    )
+
+    line_buffered = lines_gdf.buffer(line_buffer)
+    planned_gdf["touches_existing_line"] = planned_gdf.geometry.intersects(
+        line_buffered.unary_union
+    )
+    return planned_gdf
 
 # GEM Data Processing Functions - Updated for cleaned data
 def read_coal_plant_data(force_recompute=False):
@@ -714,6 +804,7 @@ def add_legend_control_script():
     }
     </script>
     '''
+
 def read_infrastructure_data(force_recompute=False):
     """
     Reads the infrastructure_data.xlsx file and returns a DataFrame.
@@ -1033,8 +1124,6 @@ def read_transmission_data(force_recompute=False):
         logging.error(f"Error reading transmission data: {str(e)}", exc_info=True)
         raise
 
-
-
 def get_source_color(source):
     """Get a consistent color for a given source type."""
     color_map = {
@@ -1142,19 +1231,24 @@ def read_powerline_data(force_recompute=False):
         logging.error(f"Error reading powerline data: {str(e)}", exc_info=True)
         return []
 
-def get_power_lines():
+def get_power_lines(force_recompute: bool = False):
     """
-    Reads the powerline data from the GPKG file and returns a GeoDataFrame.
+    Reads (and now caches) the power-line layer from the GPKG file.
     """
-    
+    if not force_recompute:
+        cached = load_from_cache("get_power_lines")
+        if cached is not None:
+            return cached
+
     if not VNM_GPKG.exists():
         logging.error(f"Could not find {VNM_GPKG}")
         raise FileNotFoundError(f"Could not find {VNM_GPKG}")
-    
+
     try:
         logging.info(f"Reading powerline data from {VNM_GPKG}")
-        gdf = gpd.read_file(VNM_GPKG, layer='power_line')
+        gdf = gpd.read_file(VNM_GPKG, layer="power_line")
         logging.info(f"Read {len(gdf)} powerline records")
+        save_to_cache("get_power_lines", gdf)
         return gdf
     except Exception as e:
         logging.error(f"Error reading powerline data: {str(e)}", exc_info=True)
