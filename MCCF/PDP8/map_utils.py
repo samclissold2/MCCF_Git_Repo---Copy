@@ -1632,3 +1632,37 @@ def read_planned_substation_data(force_recompute=False):
     except Exception as e:
         logging.error(f"Error reading transformer data: {str(e)}", exc_info=True)
         return pd.DataFrame()
+
+def read_vnm_pd_2020_1km(sample_rate: float = 1.0):
+    """
+    Reads and processes the `vnm_pd_2020_1km.tif` raster using the shared
+    `read_tif_data()` helper and returns a DataFrame with columns:
+        longitude / latitude / population_density
+
+    Args:
+        sample_rate: Fraction of points to keep from the raster (1.0 = all).
+    """
+    file_path = DATA_DIR / 'vnm_pd_2020_1km.tif'
+
+    if not file_path.exists():
+        logging.error(f"Could not find {file_path}")
+        raise FileNotFoundError(f"Could not find {file_path}")
+
+    try:
+        logging.info(f"Reading raster data via read_tif_data() from {file_path}")
+        pts = read_tif_data(file_path, sample_rate=sample_rate)
+
+        if not pts:
+            logging.warning("No valid data points found in raster – returning empty DataFrame")
+            return pd.DataFrame(columns=['longitude', 'latitude', 'population_density'])
+
+        # read_tif_data() returns a list of [lat, lon, value]
+        df = pd.DataFrame(pts, columns=['latitude', 'longitude', 'population_density'])
+        df = df[['longitude', 'latitude', 'population_density']]  # reorder for consistency
+
+        logging.info(f"Processed data shape: {df.shape}")
+        return df
+
+    except Exception as e:
+        logging.error(f"Error reading vnm_pd_2020_1km data: {str(e)}", exc_info=True)
+        return pd.DataFrame()

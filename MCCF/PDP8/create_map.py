@@ -1178,6 +1178,74 @@ def create_new_transmission_data_map():
         print(f"An error occurred during the map creation: {e}")
         return None
 
+def create_population_density_map(force_recompute: bool = False):
+    """Create a simple Folium heat-map of Vietnam 2020 population density.
+
+    The raster is sampled via utils.read_vnm_pd_2020_1km() (which delegates to
+    a cached read_tif_data helper).  The function returns *None* if the data
+    cannot be loaded so that the caller can gracefully skip map creation.
+    """
+
+    # Fetch (and possibly sample) the population-density points
+    try:
+        # 2 % sampling gives ~20 000 pts for the 1 km grid → good performance
+        df = utils.read_vnm_pd_2020_1km(sample_rate=0.02)  # type: ignore[arg-type]
+    except Exception as e:
+        logging.error("Failed to read population-density raster", exc_info=True)
+        return None
+
+    if df is None or df.empty:
+        logging.error("Population-density DataFrame is empty – skipping map")
+        return None
+
+    # Base map centred on Vietnam
+    m = folium.Map(
+        location=[16.0, 106.0],
+        zoom_start=6,
+        tiles="CartoDB Positron",
+        attr="© OpenStreetMap, © CartoDB",
+    )
+
+    # ── Increase visual contrast ────────────────────────────────────────
+    # Cap extreme high values (99th percentile) to avoid skew, then
+    # normalise and apply a square-root stretch so that mid-range densities
+    # are easier to discern on the colour scale.
+    dens = df["population_density"].astype(float)
+    cap  = dens.quantile(0.99)           # ignore extreme outliers
+    norm = np.clip(dens / cap, 0, 1) ** 0.5   # √-stretch for contrast
+
+    heat_data = np.column_stack((
+        df["latitude"].values,
+        df["longitude"].values,
+        norm.values,
+    )).tolist()
+
+    HeatMap(
+        heat_data,
+        name="Population Density (2020, 1 km)",
+        min_opacity=0.2,
+        max_opacity=0.9,
+        radius=9,
+        blur=10,
+        gradient={
+            0.0: "#0000ff",   # blue
+            0.15: "#00ffff", # cyan
+            0.3: "#00ff00",  # lime
+            0.45: "#ffff00", # yellow
+            0.6: "#ff9900",  # orange
+            0.75: "#ff0000", # red
+            0.9: "#7f0000",  # dark-red
+        },
+        show=True,
+    ).add_to(m)
+
+    folium.LayerControl(collapsed=True, position="topright").add_to(m)
+
+    for Plugin in (Fullscreen, MiniMap, MeasureControl):
+        Plugin().add_to(m)
+
+    return m
+
 def main():
     """
     Main function to create maps based on command line arguments.
@@ -1193,7 +1261,8 @@ def main():
             'wind',
             'gem',
             'all',
-            'new_transmission'    # ← ADD THIS LINE
+            'new_transmission',    # ← ADD THIS LINE
+            'population_density'    # ← ADD THIS LINE
         ], default='comprehensive',
             help="Type of map to generate")
         parser.add_argument('--force-recompute', action='store_true',
@@ -1241,6 +1310,12 @@ def main():
                 m = create_new_transmission_data_map()
                 if m:
                     save_and_open_map(m, RESULTS_DIR / 'vn_new_transmission_map.html')
+
+            if args.map == 'population_density':  # ← ADD THIS BLOCK
+                logging.info("Generating population density map")
+                m = create_population_density_map(force_recompute=args.force_recompute)
+                if m:
+                    save_and_open_map(m, RESULTS_DIR / 'vn_population_density_map.html')
 
             total_time = time.time() - start_time
             logging.info(f"Map generation completed in {total_time:.2f} seconds")
