@@ -746,7 +746,9 @@ def create_comprehensive_map(force_recompute: bool = False):
     
     # Add substations
     sdf = utils.read_substation_data()
+
     sdf = sdf[sdf['substation_type'].notna() & (sdf['substation_type'].astype(str).str.strip() != '')]
+
     # 3. Bucket substations by max_voltage and assign colors
     def voltage_category(val):
         try:
