@@ -204,7 +204,7 @@ def annotate_planned_lines(planned_df,
 
     If *subs* or *lines* are supplied, those pre-loaded datasets are used;
     otherwise they are loaded internally (cached versions if available)."""
-    start_time = time.time()
+
     logging.info("annotate_planned_lines: start (records=%d)" % len(planned_df))
 
     if planned_df.empty:
@@ -217,50 +217,43 @@ def annotate_planned_lines(planned_df,
     if lines is None:
         lines = get_power_lines()
 
-    t0 = time.time()
     planned_gdf = gpd.GeoDataFrame(
         planned_df,
         geometry=gpd.points_from_xy(planned_df["lon"], planned_df["lat"]),
         crs="EPSG:4326",
     ).to_crs("EPSG:3857")
-    logging.info("annotate_planned_lines: converted planned_df → GeoDataFrame in %.2fs" % (time.time()-t0))
 
-    t0 = time.time()
     subs_gdf = gpd.GeoDataFrame(
         subs,
         geometry=gpd.points_from_xy(subs["longitude"], subs["latitude"]),
         crs="EPSG:4326",
     ).to_crs("EPSG:3857")
-    logging.info("annotate_planned_lines: converted substations → GeoDataFrame in %.2fs" % (time.time()-t0))
 
-    t0 = time.time()
     lines_gdf = lines.to_crs("EPSG:3857")
-    logging.info("annotate_planned_lines: re-projected lines (count=%d) in %.2fs" % (len(lines_gdf), time.time()-t0))
 
-    t0 = time.time()
     nearest = gpd.sjoin_nearest(
         planned_gdf, subs_gdf, how="left", distance_col="dist_m"
     )
-    logging.info("annotate_planned_lines: sjoin_nearest finished in %.2fs" % (time.time()-t0))
 
     planned_gdf["nearest_substation_dist_m"] = nearest["dist_m"]
-    logging.info("annotate_planned_lines: added nearest_substation_dist_m; <=%dm count=%d" % (
-        substation_buffer,
-        (planned_gdf["nearest_substation_dist_m"] <= substation_buffer).sum()))
 
-    t0 = time.time()
+    # Flag: is the planned point within the substation_buffer distance of an
+    # existing substation?  This is required by planned_connections_map.py so
+    # that its cache check passes and expensive spatial joins are skipped on
+    # subsequent runs.
+    planned_gdf["near_existing_sub"] = (
+        planned_gdf["nearest_substation_dist_m"] <= substation_buffer
+    )
+    logging.info(
+        "annotate_planned_lines: added near_existing_sub; <=%dm count=%d"
+        % (substation_buffer, planned_gdf["near_existing_sub"].sum())
+    )
+
     line_buffered = lines_gdf.buffer(line_buffer)
-    logging.info("annotate_planned_lines: buffered %d lines (buffer=%dm) in %.2fs" % (len(lines_gdf), line_buffer, time.time()-t0))
 
-    t0 = time.time()
     union = line_buffered.unary_union
     planned_gdf["touches_existing_line"] = planned_gdf.geometry.intersects(union)
-    logging.info("annotate_planned_lines: intersection test finished in %.2fs (touches=%d)" % (
-        time.time()-t0,
-        planned_gdf["touches_existing_line"].sum()))
 
-    elapsed = time.time() - start_time
-    logging.info(f"annotate_planned_lines: completed in {elapsed:.2f}s (records={len(planned_gdf)})")
     return planned_gdf
 
 # GEM Data Processing Functions - Updated for cleaned data

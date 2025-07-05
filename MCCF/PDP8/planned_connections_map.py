@@ -47,6 +47,7 @@ get_voltage_color            = utils.get_voltage_color
 load_from_cache              = utils.load_from_cache
 save_to_cache                = utils.save_to_cache
 cache_polylines              = utils.cache_polylines
+population_data = utils.read_vnm_pd_2020_1km()
 
 
 def features_to_gdf(features):
@@ -142,7 +143,6 @@ if "voltage_cat" not in lines_raw.columns:
 if "voltage_cat" not in substations.columns and "max_voltage" in substations.columns:
     substations["voltage_cat"] = substations["max_voltage"].apply(voltage_category)
 
-breakpoint()
 if "voltage_cat" not in planned_subs.columns and "voltage" in planned_subs.columns:
     planned_subs["voltage_cat"] = planned_subs["voltage"].apply(voltage_category)
 
