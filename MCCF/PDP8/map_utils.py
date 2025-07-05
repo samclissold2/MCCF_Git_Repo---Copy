@@ -100,6 +100,20 @@ def setup_logging():
 # Initialize logging when module is imported
 setup_logging()
 
+class log_time:
+    """Simple context manager for timed logging."""
+
+    def __init__(self, label: str):
+        self.label = label
+
+    def __enter__(self):
+        self.start = time.time()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        elapsed = time.time() - self.start
+        logging.info(f"{self.label} in {elapsed:.2f}s")
+
 def split_circuit_km(value):
     """Parse '#circuits×km' strings."""
     if value is None or str(value).strip() == "":
@@ -195,17 +209,40 @@ def read_new_transmission_data(force_recompute=False):
         logging.error(f"Error reading PDP8 transmission data: {str(e)}", exc_info=True)
         raise
 
-def annotate_planned_lines(planned_df,
-                           subs=None,
-                           lines=None,
-                           substation_buffer: int = 1000,
-                           line_buffer: int = 250):
-    """Attach nearest substations and existing-line proximity flags.
+def annotate_planned_lines(
+    planned_df: pd.DataFrame,
+    subs: pd.DataFrame | None = None,
+    lines: gpd.GeoDataFrame | None = None,
+    substation_buffer: int = 1000,
+    line_buffer: int = 250,
+) -> gpd.GeoDataFrame:
+    """Attach proximity information to planned transmission line points.
 
-    If *subs* or *lines* are supplied, those pre-loaded datasets are used;
-    otherwise they are loaded internally (cached versions if available)."""
+    Parameters
+    ----------
+    planned_df : DataFrame
+        Table containing ``lat`` and ``lon`` columns for planned points.
+    subs : DataFrame, optional
+        Existing substations. If ``None`` they are loaded automatically.
+    lines : GeoDataFrame, optional
+        Existing transmission lines. Loaded automatically if ``None``.
+    substation_buffer : int, default ``1000``
+        Distance in metres used to flag ``near_existing_sub``.
+    line_buffer : int, default ``250``
+        Buffer in metres used to detect intersection with existing lines.
+
+    Returns
+    -------
+    GeoDataFrame
+        The ``planned_df`` with geometry in EPSG:3857 and extra columns:
+        ``nearest_substation_dist_m``, ``near_existing_sub`` and
+        ``touches_existing_line``.
+    """
+
     start_time = time.time()
-    logging.info("annotate_planned_lines: start (records=%d)" % len(planned_df))
+    logging.info(
+        "annotate_planned_lines: start (records=%d)" % len(planned_df)
+    )
 
     if planned_df.empty:
         logging.warning("annotate_planned_lines: input dataframe empty – returning early")
@@ -217,47 +254,32 @@ def annotate_planned_lines(planned_df,
     if lines is None:
         lines = get_power_lines()
 
-    t0 = time.time()
-    planned_gdf = gpd.GeoDataFrame(
-        planned_df,
-        geometry=gpd.points_from_xy(planned_df["lon"], planned_df["lat"]),
-        crs="EPSG:4326",
-    ).to_crs("EPSG:3857")
-    logging.info("annotate_planned_lines: converted planned_df → GeoDataFrame in %.2fs" % (time.time()-t0))
+    with log_time("convert inputs to GeoDataFrames"):
+        planned_gdf = gpd.GeoDataFrame(
+            planned_df,
+            geometry=gpd.points_from_xy(planned_df["lon"], planned_df["lat"]),
+            crs="EPSG:4326",
+        ).to_crs("EPSG:3857")
+        subs_gdf = gpd.GeoDataFrame(
+            subs,
+            geometry=gpd.points_from_xy(subs["longitude"], subs["latitude"]),
+            crs="EPSG:4326",
+        ).to_crs("EPSG:3857")
+        lines_gdf = lines.to_crs("EPSG:3857")
 
-    t0 = time.time()
-    subs_gdf = gpd.GeoDataFrame(
-        subs,
-        geometry=gpd.points_from_xy(subs["longitude"], subs["latitude"]),
-        crs="EPSG:4326",
-    ).to_crs("EPSG:3857")
-    logging.info("annotate_planned_lines: converted substations → GeoDataFrame in %.2fs" % (time.time()-t0))
-
-    t0 = time.time()
-    lines_gdf = lines.to_crs("EPSG:3857")
-    logging.info("annotate_planned_lines: re-projected lines (count=%d) in %.2fs" % (len(lines_gdf), time.time()-t0))
-
-    t0 = time.time()
-    nearest = gpd.sjoin_nearest(
-        planned_gdf, subs_gdf, how="left", distance_col="dist_m"
+    with log_time("compute nearest substation"):
+        nearest = gpd.sjoin_nearest(
+            planned_gdf, subs_gdf, how="left", distance_col="nearest_substation_dist_m"
+        )
+    planned_gdf["nearest_substation_dist_m"] = nearest["nearest_substation_dist_m"]
+    planned_gdf["near_existing_sub"] = (
+        planned_gdf["nearest_substation_dist_m"] <= substation_buffer
     )
-    logging.info("annotate_planned_lines: sjoin_nearest finished in %.2fs" % (time.time()-t0))
 
-    planned_gdf["nearest_substation_dist_m"] = nearest["dist_m"]
-    logging.info("annotate_planned_lines: added nearest_substation_dist_m; <=%dm count=%d" % (
-        substation_buffer,
-        (planned_gdf["nearest_substation_dist_m"] <= substation_buffer).sum()))
-
-    t0 = time.time()
-    line_buffered = lines_gdf.buffer(line_buffer)
-    logging.info("annotate_planned_lines: buffered %d lines (buffer=%dm) in %.2fs" % (len(lines_gdf), line_buffer, time.time()-t0))
-
-    t0 = time.time()
-    union = line_buffered.unary_union
-    planned_gdf["touches_existing_line"] = planned_gdf.geometry.intersects(union)
-    logging.info("annotate_planned_lines: intersection test finished in %.2fs (touches=%d)" % (
-        time.time()-t0,
-        planned_gdf["touches_existing_line"].sum()))
+    with log_time("buffer lines and check intersections"):
+        buffered = gpd.GeoDataFrame(geometry=lines_gdf.buffer(line_buffer))
+        join = gpd.sjoin(planned_gdf, buffered, how="left", predicate="intersects")
+    planned_gdf["touches_existing_line"] = ~join.index_right.isna()
 
     elapsed = time.time() - start_time
     logging.info(f"annotate_planned_lines: completed in {elapsed:.2f}s (records={len(planned_gdf)})")
@@ -1187,6 +1209,35 @@ def get_voltage_color(voltage):
     except (ValueError, TypeError):
         return '#999999'  # Gray for unparseable voltage values
 
+def voltage_category(val) -> str:
+    """Return a categorical kV label for a numeric or string value."""
+    try:
+        if isinstance(val, str):
+            val = re.sub(r"[^\d.]", "", val)
+        v = float(val)
+        if v < 1_000:
+            v *= 1_000
+        if v >= 500_000:
+            return "500kV"
+        elif v >= 220_000:
+            return "220kV"
+        elif v >= 115_000:
+            return "115kV"
+        elif v >= 110_000:
+            return "110kV"
+        elif v >= 50_000:
+            return "50kV"
+        elif v >= 33_000:
+            return "33kV"
+        elif v >= 25_000:
+            return "25kV"
+        elif v >= 22_000:
+            return "22kV"
+        else:
+            return "<22kV"
+    except (ValueError, TypeError):
+        return "Unknown"
+
 def read_powerline_data(force_recompute=False):
     """
     Reads and processes powerline data, returning clustered transmission lines.
@@ -1208,30 +1259,6 @@ def read_powerline_data(force_recompute=False):
             return []
         
         # Categorize by max_voltage for lines
-        def voltage_category(val):
-            try:
-                v = float(val)
-                if v >= 500000:
-                    return '500kV'
-                elif v >= 220000:
-                    return '220kV'
-                elif v >= 115000:
-                    return '115kV'
-                elif v >= 110000:
-                    return '110kV'
-                elif v >= 50000:
-                    return '50kV'
-                elif v >= 33000:
-                    return '33kV'
-                elif v >= 25000:
-                    return '25kV'
-                elif v >= 22000:
-                    return '22kV'
-                else:
-                    return '<22kV'
-            except:
-                return 'Unknown'
-
         if 'max_voltage' in gdf.columns:
             gdf['voltage_cat'] = gdf['max_voltage'].apply(voltage_category)
         else:
@@ -1317,30 +1344,6 @@ def cache_polylines(gdf, cache_file='powerline_polylines.geojson', eps=0.0025, m
         return features
     
     # Group power lines by voltage category
-
-    def voltage_category(val):
-        try:
-            v = float(val)
-            if v >= 500000:
-                return '500kV'
-            elif v >= 220000:
-                return '220kV'
-            elif v >= 115000:
-                return '115kV'
-            elif v >= 110000:
-                return '110kV'
-            elif v >= 50000:
-                return '50kV'
-            elif v >= 33000:
-                return '33kV'
-            elif v >= 25000:
-                return '25kV'
-            elif v >= 22000:
-                return '22kV'
-            else:
-                return '<22kV'
-        except:
-            return 'Unknown'
     if 'max_voltage' in gdf.columns:
         gdf['voltage_cat'] = gdf['max_voltage'].apply(voltage_category)
     else:
@@ -1526,7 +1529,36 @@ def create_wind_power_density_layer(force_recompute: bool = False):
     save_to_cache("wind_heatmap_layer", heat)           # ← NEW
     return heat
 
-def read_planned_substation_data(force_recompute=False):
+def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Return a copy of *df* with normalised column names."""
+    df = df.copy()
+    df.columns = (
+        df.columns.str.strip().str.lower()
+        .str.replace(r"[^\w\s]", "", regex=True)
+        .str.replace(r"\s+", "_", regex=True)
+    )
+    return df
+
+_VOLTAGE_PATTERNS = {
+    "500kv": "500kV",
+    "220kv": "220kV",
+    "200kv": "220kV",
+    "115kv": "115kV",
+    "110kv": "110kV",
+    "50kv": "50kV",
+    "33kv": "33kV",
+    "25kv": "25kV",
+    "22kv": "22kV",
+}
+
+def _infer_voltage_from_sheet(sheet_name: str) -> str | None:
+    low = sheet_name.lower()
+    for pat, val in _VOLTAGE_PATTERNS.items():
+        if pat in low or pat.replace("kv", "_kv") in low:
+            return val
+    return None
+
+def read_planned_substation_data(force_recompute: bool = False, *, as_gdf: bool = False):
     """
     Reads the PDP8_new_transformer.xlsx file and extracts transformer data from all worksheets.
     Returns a DataFrame with transformer information including voltage categorization.
@@ -1541,57 +1573,31 @@ def read_planned_substation_data(force_recompute=False):
     logging.info("Starting planned substation data reading")
     
     transformer_file = DATA_DIR / "PDP8_new_transformer.xlsx"
-    
+
     if not transformer_file.exists():
         logging.error(f"Planned substation file not found: {transformer_file}")
-        return pd.DataFrame()
+        raise FileNotFoundError(f"Could not find {transformer_file}")
     
     try:
-        # Read all sheets from the Excel file
         logging.info(f"Reading substation data from {transformer_file}")
         excel_file = pd.ExcelFile(transformer_file)
-        logging.info(f"Found {len(excel_file.sheet_names)} worksheets: {excel_file.sheet_names}")
+        logging.info(
+            f"Found {len(excel_file.sheet_names)} worksheets: {excel_file.sheet_names}"
+        )
         
         all_dfs = []
         
         for sheet_name in excel_file.sheet_names:
             sheet_start_time = time.time()
             logging.info(f"Processing sheet: {sheet_name}")
-            
-            # Try to detect voltage from sheet name
-            sheet_name_lower = sheet_name.lower()
-            sheet_voltage = None
-            
-            # Map sheet names to voltage categories
-            voltage_patterns = {
-                '500kv': '500kV',
-                '220kv': '220kV',
-                '200kv': '220kV',  # Map 200kV to 220kV category
-                '115kv': '115kV',
-                '110kv': '110kV',
-                '50kv': '50kV',
-                '33kv': '33kV',
-                '25kv': '25kV',
-                '22kv': '22kV'
-            }
-            
-            # Check for voltage in sheet name
-            for pattern, voltage in voltage_patterns.items():
-                if pattern in sheet_name_lower or pattern.replace('kv', '_kv') in sheet_name_lower:
-                    sheet_voltage = voltage
-                    logging.info(f"Detected voltage {voltage} from sheet name")
-                    break
-            
-            # Read the sheet
-            df = pd.read_excel(transformer_file, sheet_name=sheet_name)
+
+            sheet_voltage = _infer_voltage_from_sheet(sheet_name)
+            if sheet_voltage:
+                logging.info(f"Detected voltage {sheet_voltage} from sheet name")
+
+            df = excel_file.parse(sheet_name)
             logging.info(f"Initial data shape for {sheet_name}: {df.shape}")
-            
-            # Clean column names
-            df.columns = (
-                df.columns.str.strip().str.lower()
-                  .str.replace(r"[^\w\s]", "", regex=True)
-                  .str.replace(r"\s+", "_", regex=True)
-            )
+            df = _clean_columns(df)
             
             # Look for key columns
             lat_col = next((col for col in df.columns if 'lat' in col.lower()), None)
@@ -1639,21 +1645,29 @@ def read_planned_substation_data(force_recompute=False):
             logging.info("Combining all processed sheets")
             combined_df = pd.concat(all_dfs, ignore_index=True)
             logging.info(f"Final combined shape: {combined_df.shape}")
-            
+
             processing_time = time.time() - start_time
-            logging.info(f"Transformer data processing completed in {processing_time:.2f} seconds")
-            
-            # Save to cache
-            save_to_cache('read_planned_substation_data', combined_df)
-            
+            logging.info(
+                f"Transformer data processing completed in {processing_time:.2f} seconds"
+            )
+
+            save_to_cache("read_planned_substation_data", combined_df)
+
+            if as_gdf:
+                gdf = gpd.GeoDataFrame(
+                    combined_df,
+                    geometry=gpd.points_from_xy(combined_df["lon"], combined_df["lat"]),
+                    crs="EPSG:4326",
+                )
+                return gdf
             return combined_df
         else:
             logging.warning("No valid transformer data found in any worksheet")
-            return pd.DataFrame()
+            return gpd.GeoDataFrame() if as_gdf else pd.DataFrame()
             
     except Exception as e:
         logging.error(f"Error reading transformer data: {str(e)}", exc_info=True)
-        return pd.DataFrame()
+        raise
 
 def read_vnm_pd_2020_1km(sample_rate: float = 1.0):
     """
