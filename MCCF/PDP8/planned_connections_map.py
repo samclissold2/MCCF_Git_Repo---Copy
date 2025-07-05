@@ -214,8 +214,13 @@ def main(argv=None):
 
     planned_gdf["connection_type"] = planned_gdf.apply(classify, axis=1)
 
-    # ensure voltage_cat present for planned_gdf (derived from nearest_line_kV if missing)
+    # Guarantee SD-class columns present (for older cache versions)
+    if "nearest_sd_class" not in planned_gdf.columns:
+        planned_gdf["nearest_sd_class"] = "Unknown"
+    if "nearest_sd_conf" not in planned_gdf.columns:
+        planned_gdf["nearest_sd_conf"] = np.nan
 
+    # ensure voltage_cat present for planned_gdf (derived from nearest_line_kV if missing)
     if "voltage_cat" not in planned_gdf.columns:
         planned_gdf["voltage_cat"] = planned_gdf["kV"].apply(voltage_category)
 
@@ -257,7 +262,7 @@ def main(argv=None):
         folium.GeoJson(
             row.geometry.__geo_interface__,
             style_function=lambda _, col=colour: dict(color=col,
-                                                      weight=2, opacity=0.8),
+                                                      weight=4, opacity=0.7),
             tooltip=folium.Tooltip(f"{row['voltage_cat']} line", sticky=False)
         ).add_to(line_layer)
     line_layer.add_to(m)
@@ -266,9 +271,9 @@ def main(argv=None):
     sub_layer = folium.FeatureGroup(name="Substations")
     for _, row in substations.iterrows():
         colour = sd_col_map.get(row.sd_class, "#999999")
-        folium.CircleMarker(
+        folium.Marker(
             location=[row.latitude, row.longitude],
-            radius=4, color=colour, fill=True, fill_opacity=.9
+            icon=folium.DivIcon(html=f'<div style="font-size:10px; color:{colour}; font-weight:bold;">×</div>'),
         ).add_child(folium.Tooltip(
             f"Sub {row.substation_type} ({row['voltage_cat']})"
             f"<br><b>{row.sd_class}</b>  p={row.sd_conf:.2f}",
@@ -290,7 +295,7 @@ def main(argv=None):
         f"<br>Existing sub distance: {row.nearest_substation_dist_m:,.0f} m"
         f"<br>Planned sub distance: {row.planned_sub_dist_m:,.0f} m"
         f"<br>Touches line: {row.touches_existing_line}"
-        f"<br>Nearest sub SD class: {row.nearest_sd_class}",
+        f"<br>Nearest sub SD class: {row.get('nearest_sd_class', 'Unknown')}",
         sticky=True
     )).add_to(plan_layer)
     plan_layer.add_to(m)
@@ -299,9 +304,9 @@ def main(argv=None):
     planned_sub_layer = folium.FeatureGroup(name="Planned Substations", show=True)
     for _, row in planned_subs.iterrows():
         colour = voltage_colors.get(row.get("voltage_cat", "Unknown"), "black")
-        folium.CircleMarker(
+        folium. Marker(
             location=[row.lat, row.lon],
-            radius=4, color=colour, fill=True, fill_opacity=.9
+            icon=folium.DivIcon(html=f'<div style="font-size:10px; color:{colour}; font-weight:bold;">×</div>'),
         ).add_child(folium.Tooltip(
         f"Planned substation ({row.get('voltage_cat', 'Unknown')})",
         sticky=True

@@ -21,6 +21,9 @@ def _assemble_generation_sites() -> gpd.GeoDataFrame:
         read_hydropower_data()
     ]
     gdf = pd.concat(dfs, ignore_index=True, sort=False)
+    # normalise capacity column name
+    if "Capacity_MW" not in gdf.columns and "capacity" in gdf.columns:
+        gdf = gdf.rename(columns={"capacity": "Capacity_MW"})
     gdf = gdf.dropna(subset=["latitude", "longitude"])
     gdf = gpd.GeoDataFrame(
         gdf,
@@ -54,25 +57,39 @@ def build_sd_features(subs: gpd.GeoDataFrame, force_recompute=False) -> gpd.GeoD
     dist_list, cap_list, var_list = [], [], []
     for geom in subs.geometry:
         # index of closest generation point
-        idx = list(gen_sindex.nearest(geom.bounds, 1))[0]
+        idx_raw = list(gen_sindex.nearest(geom, 1))[0]
+        # GeoPandas can return:
+        #   • int
+        #   • (src_idx, nbr_idx)
+        #   • list/array of ints
+        if isinstance(idx_raw, tuple):
+            idx = idx_raw[1]
+        elif isinstance(idx_raw, (list, np.ndarray)):
+            idx = idx_raw[0]
+        else:
+            idx = idx_raw
         dist  = geom.distance(gens.geometry.iloc[idx]) / 1_000  # km
         dist_list.append(dist)
-        cap_list.append(gens.Capacity_MW.iloc[idx])
-        var_list.append(int(gens.is_variable.iloc[idx]))
+        cap_col = "Capacity_MW"  # ensured by _assemble_generation_sites()
+        cap_list.append(gens[cap_col].iloc[idx])
+        # Ensure scalar boolean → int (0/1)
+        var_val = gens.is_variable.iloc[idx]
+        if not np.isscalar(var_val):  # Series -> take first value
+            var_val = var_val.iloc[0]
+        var_list.append(int(bool(var_val)))
 
     subs["dist_gen_km"]      = dist_list
     subs["nearest_gen_mw"]   = cap_list
     subs["nearest_gen_var"]  = var_list
 
     # ---- sum of generation within 5 km radius ------------------------------
-    buffer_5 = gpd.GeoSeries(subs.geometry).buffer(5_000)
     tree     = cKDTree(np.column_stack([gens.geometry.x, gens.geometry.y]))
     sums5, varfrac = [], []
     for geom in subs.geometry:
         idxs = list(tree.query_ball_point([geom.x, geom.y], r=5_000))
         if idxs:
             sel = gens.iloc[idxs]
-            sums5.append(sel.Capacity_MW.sum())
+            sums5.append(sel[cap_col].sum())
             varfrac.append(sel.is_variable.mean())
         else:
             sums5.append(0)
@@ -84,7 +101,8 @@ def build_sd_features(subs: gpd.GeoDataFrame, force_recompute=False) -> gpd.GeoD
     pop_sindex = pop_gdf.sindex
     pop_vals   = []
     for geom in subs.geometry:
-        idxs = list(pop_sindex.nearest(geom.bounds, 1))
+        idxs_raw = list(pop_sindex.nearest(geom, 1))
+        idxs = [r[1] if isinstance(r, tuple) else r for r in idxs_raw]
         pop_vals.append(pop_gdf.population_density.iloc[idxs[0]])
     subs["pop_density"] = pop_vals
 
@@ -123,12 +141,25 @@ def classify_step(sd_features: gpd.GeoDataFrame, *, retrain=False) -> gpd.GeoDat
     except FileNotFoundError:
         # ---- minimal hand-label seed --------------------------------------
         seed = sd_features.sample(40, random_state=1).copy()
+        # Ensure numeric types for rule-based labelling
+        seed["dist_gen_km"] = pd.to_numeric(seed["dist_gen_km"], errors="coerce").fillna(999)
+        seed["pop_density"] = pd.to_numeric(seed["pop_density"], errors="coerce").fillna(0)
         # Manually tag a few for first train → user can refine later
         seed["Label"] = np.where(seed.dist_gen_km < 3, "Step-Up",
                            np.where(seed.pop_density > 400, "Step-Down",
                                     "Interconnection"))
         X = seed[feature_cols]
         y = seed.Label
+
+        # ── ensure at least two classes to satisfy scikit-learn ──────────
+        if y.nunique() < 2:
+            # pick 5 random rows (or all if <5) to flip to another class
+            alt_class = "Interconnection" if y.iloc[0] != "Interconnection" else "Step-Down"
+            n_flip = min(5, len(y))
+            flip_idx = y.sample(n_flip, random_state=2).index
+            y.loc[flip_idx] = alt_class
+
+        X = X.fillna(0)
         clf = GradientBoostingClassifier().fit(X, y)
         from joblib import dump
         dump(clf, model_path)

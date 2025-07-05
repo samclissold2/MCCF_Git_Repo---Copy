@@ -24,11 +24,14 @@ from config import (
     NEW_TRANSMISSION_DATA
 )
 import rasterio
-# try:
-#     from . import sd_classifier as sd_classifier  # Package-relative import
-# except ImportError:  # pragma: no cover – stand-alone execution fallback
-#     import importlib
-#     import sys
+try:
+    from . import sd_classifier         # package context
+except ImportError:
+    import importlib, os, sys, pathlib
+    pkg_dir = pathlib.Path(__file__).resolve().parent  # …/MCCF/PDP8
+    if str(pkg_dir) not in sys.path:
+        sys.path.insert(0, str(pkg_dir))
+    sd_classifier = importlib.import_module("sd_classifier")
 
 
 #test for push
@@ -219,7 +222,7 @@ def annotate_planned_lines(planned_df,
                            subs=None,
                            lines=None,
                            substation_buffer: int = 1000,
-                           line_buffer: int = 250):
+                           line_buffer: int = 100):
     """Attach nearest substations and existing-line proximity flags.
 
     If *subs* or *lines* are supplied, those pre-loaded datasets are used;
@@ -1737,7 +1740,7 @@ def get_sd_classified_substations(force_recompute=False):
         geometry=gpd.points_from_xy(subs.longitude, subs.latitude),
         crs="EPSG:4326",
     )
-    features = build_sd_features(gdf)
-    tagged   = classify_step(features)
+    features = sd_classifier.build_sd_features(gdf)
+    tagged   = sd_classifier.classify_step(features)
     save_to_cache("sd_classified_subs", tagged)
     return tagged

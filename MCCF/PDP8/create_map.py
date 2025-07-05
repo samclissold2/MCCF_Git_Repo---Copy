@@ -204,7 +204,7 @@ def save_and_open_map(m, output_file=None):
     except Exception as e:
         logging.error(f"Error saving/opening map: {str(e)}", exc_info=True)
         raise
-    
+
 def create_wind_power_density_map():
     """
     Creates a dedicated map for wind power density visualization.
