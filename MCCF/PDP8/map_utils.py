@@ -1070,9 +1070,7 @@ def create_folium_map(df):
 def save_and_open_map(m, output_file=None):
     start_time = time.time()
     logging.info("Starting map saving process")
-    
-    if output_file is None:
-        output_file = PROJECTS_MAP
+
     
     try:
         logging.info(f"Saving map to {output_file}")
@@ -1552,8 +1550,26 @@ def read_planned_substation_data(force_recompute: bool = False, *, as_gdf: bool 
     if not force_recompute:
         cached_data = load_from_cache('read_planned_substation_data')
         if cached_data is not None:
-            return cached_data
-    
+            # --- Ensure return type matches as_gdf flag --------------------
+            if as_gdf:
+                if isinstance(cached_data, gpd.GeoDataFrame):
+                    return cached_data  # already correct type
+                # Cached object is a plain DataFrame → convert on-the-fly
+                if {'lat', 'lon'}.issubset(cached_data.columns):
+                    return gpd.GeoDataFrame(
+                        cached_data.copy(),
+                        geometry=gpd.points_from_xy(cached_data["lon"], cached_data["lat"]),
+                        crs="EPSG:4326",
+                    )
+                # Fallback: return an empty GeoDataFrame to avoid attribute errors
+                logging.warning("Cached planned substation data lacks lat/lon — returning empty GeoDataFrame")
+                return gpd.GeoDataFrame()
+            else:  # as_gdf is False
+                # If caller expects a pandas.DataFrame ensure we don't return GeoDataFrame
+                if isinstance(cached_data, gpd.GeoDataFrame):
+                    return pd.DataFrame(cached_data.drop(columns="geometry"))
+                return cached_data
+
     start_time = time.time()
     logging.info("Starting planned substation data reading")
     

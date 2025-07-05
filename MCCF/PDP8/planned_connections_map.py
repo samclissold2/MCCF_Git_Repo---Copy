@@ -9,6 +9,8 @@ import logging
 from shapely.geometry import LineString
 import time
 import os, importlib, sys
+import numpy as np
+from folium.plugins import HeatMap
 
 from config import (
     INFRASTRUCTURE_DATA,
@@ -292,6 +294,40 @@ def main(argv=None):
         sticky=True
     )).add_to(planned_sub_layer)
     planned_sub_layer.add_to(m)
+
+# ---------- layer: population-density heat-map ------------------------------
+    if population_data is not None and not population_data.empty:
+        # Replicate the contrast-stretch logic from create_population_density_map()
+        dens = population_data["population_density"].astype(float)
+        cap = dens.quantile(0.99)  # ignore extreme outliers
+        norm = np.clip(dens / cap, 0, 1) ** 0.5  # √-stretch for visual contrast
+
+        heat_data = np.column_stack(
+            (
+                population_data["latitude"].values,
+                population_data["longitude"].values,
+                norm.values,
+            )
+        ).tolist()
+
+        HeatMap(
+            heat_data,
+            name="Population Density (2020, 1 km)",
+            min_opacity=0.2,
+            max_opacity=0.9,
+            radius=9,
+            blur=10,
+            gradient={
+                0.0: "#0000ff",   # blue
+                0.15: "#00ffff", # cyan
+                0.3: "#00ff00",  # lime
+                0.45: "#ffff00", # yellow
+                0.6: "#ff9900",  # orange
+                0.75: "#ff0000", # red
+                0.9: "#7f0000",  # dark-red
+            },
+            show=False,  # hidden by default; toggle via LayerControl
+        ).add_to(m)
 
 # ---------- legend & controls ------------------------------------------------
     legend_html = """
