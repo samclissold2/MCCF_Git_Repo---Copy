@@ -178,6 +178,11 @@ def read_new_transmission_data(force_recompute=False):
                     df_sheet["Number of circuits × kilometres"].apply(split_circuit_km)
                 )
 
+            # ---- handle capacity column -----------------------------------
+            cap_col = next((c for c in df_sheet.columns if "capacity" in c.lower() and "mva" in c.lower()), None)
+            if cap_col:
+                df_sheet["capacity_mva"] = pd.to_numeric(df_sheet[cap_col], errors="coerce")
+
             lat_col = next((c for c in df_sheet.columns if "lat" in c.lower()), None)
             lon_col = next((c for c in df_sheet.columns if "lon" in c.lower()), None)
             if lat_col and lon_col:
