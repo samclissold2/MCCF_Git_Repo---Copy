@@ -41,14 +41,17 @@ except ImportError:  # stand-alone execution fallback
 read_new_transmission_data   = utils.read_new_transmission_data
 split_circuit_km             = utils.split_circuit_km
 annotate_planned_lines       = utils.annotate_planned_lines
-read_substation_data         = utils.read_substation_data
+get_sd_classified_substations = utils.get_sd_classified_substations
+substations = get_sd_classified_substations()
 read_planned_substation_data = utils.read_planned_substation_data
 get_power_lines              = utils.get_power_lines
 get_voltage_color            = utils.get_voltage_color
 load_from_cache              = utils.load_from_cache
 save_to_cache                = utils.save_to_cache
 cache_polylines              = utils.cache_polylines
-population_data = utils.read_vnm_pd_2020_1km()
+population_data              = utils.read_vnm_pd_2020_1km()
+
+voltage_category             = utils.voltage_category
 
 
 def features_to_gdf(features):
@@ -108,7 +111,7 @@ def main(argv=None):
 # -----------------------------------------------------------------------------  
 # STEP 2 – load supporting datasets ONCE
 # -----------------------------------------------------------------------------
-    substations = read_substation_data()
+    substations = get_sd_classified_substations()
     substations = substations[substations['substation_type'].notna() & (substations['substation_type'].astype(str).str.strip() != '')]
     features    = cache_polylines(
         get_power_lines(),
@@ -237,6 +240,14 @@ def main(argv=None):
     "Unknown": "black",
 }
 
+# Step-Up / Step-Down classification colours
+    sd_col_map = {
+        "Step-Down": "#1f78b4",         # blue
+        "Step-Up": "#e31a1c",           # red
+        "Interconnection": "#ff7f00",   # orange
+        "Uncertain": "#6a3d9a",         # purple
+    }
+
 # ---------- layer: existing transmission lines ------------------------------
     line_layer = folium.FeatureGroup(name="Existing Lines", show=False)
     for _, row in lines_raw.iterrows():
@@ -254,12 +265,13 @@ def main(argv=None):
 # ---------- layer: existing substations --------------------------------------
     sub_layer = folium.FeatureGroup(name="Substations")
     for _, row in substations.iterrows():
-        colour = voltage_colors.get(row.get("voltage_cat", "Unknown"), "black")
+        colour = sd_col_map.get(row.sd_class, "#999999")
         folium.CircleMarker(
             location=[row.latitude, row.longitude],
             radius=4, color=colour, fill=True, fill_opacity=.9
         ).add_child(folium.Tooltip(
-            f"Substation {row.substation_type} ({row['voltage_cat']})",
+            f"Sub {row.substation_type} ({row['voltage_cat']})"
+            f"<br><b>{row.sd_class}</b>  p={row.sd_conf:.2f}",
             sticky=True
         )).add_to(sub_layer)
     sub_layer.add_to(m)
@@ -277,7 +289,8 @@ def main(argv=None):
         f"<br>Connection type: {row.connection_type}"
         f"<br>Existing sub distance: {row.nearest_substation_dist_m:,.0f} m"
         f"<br>Planned sub distance: {row.planned_sub_dist_m:,.0f} m"
-        f"<br>Touches line: {row.touches_existing_line}",
+        f"<br>Touches line: {row.touches_existing_line}"
+        f"<br>Nearest sub SD class: {row.nearest_sd_class}",
         sticky=True
     )).add_to(plan_layer)
     plan_layer.add_to(m)

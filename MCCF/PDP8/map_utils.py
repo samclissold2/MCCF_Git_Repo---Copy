@@ -24,6 +24,12 @@ from config import (
     NEW_TRANSMISSION_DATA
 )
 import rasterio
+# try:
+#     from . import sd_classifier as sd_classifier  # Package-relative import
+# except ImportError:  # pragma: no cover – stand-alone execution fallback
+#     import importlib
+#     import sys
+
 
 #test for push
 
@@ -243,6 +249,10 @@ def annotate_planned_lines(planned_df,
         crs="EPSG:4326",
     ).to_crs("EPSG:3857")
 
+    if "sd_class" not in subs_gdf.columns:
+        subs_gdf = get_sd_classified_substations().to_crs(subs_gdf.crs)
+
+
     lines_gdf = lines.to_crs("EPSG:3857")
 
     nearest = gpd.sjoin_nearest(
@@ -267,6 +277,12 @@ def annotate_planned_lines(planned_df,
 
     union = line_buffered.unary_union
     planned_gdf["touches_existing_line"] = planned_gdf.geometry.intersects(union)
+
+    # attach SD label of nearest sub
+    planned_gdf["nearest_sd_class"] = nearest["sd_class"]
+    planned_gdf["nearest_sd_conf"]  = nearest["sd_conf"]
+
+
 
     return planned_gdf
 
@@ -1703,3 +1719,25 @@ def read_vnm_pd_2020_1km(sample_rate: float = 1.0):
     except Exception as e:
         logging.error(f"Error reading vnm_pd_2020_1km data: {str(e)}", exc_info=True)
         return pd.DataFrame()
+
+
+# ─── STEP-UP / STEP-DOWN accessor ────────────────────────────────────────────
+def get_sd_classified_substations(force_recompute=False):
+    """
+    Returns substation GeoDataFrame with `sd_class` and `sd_conf`.
+    """
+    cached = load_from_cache("sd_classified_subs")
+    if cached is not None and not force_recompute:
+        return cached
+
+    subs = read_substation_data().copy()
+    # keep MVA if you have it; else will be zero
+    gdf  = gpd.GeoDataFrame(
+        subs,
+        geometry=gpd.points_from_xy(subs.longitude, subs.latitude),
+        crs="EPSG:4326",
+    )
+    features = build_sd_features(gdf)
+    tagged   = classify_step(features)
+    save_to_cache("sd_classified_subs", tagged)
+    return tagged
